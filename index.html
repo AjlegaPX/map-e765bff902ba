@@ -173,6 +173,9 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
     <label>Ключ 2ГИС Places API</label>
     <input id="key2gis" placeholder="Ключ 2ГИС" autocomplete="off">
     <p class="hint">Демо-ключ даёт 1 000 запросов. С этого устройства сделано: <b id="reqcount">0</b>. Заведения кешируются на сутки, повторные открытия и небольшие сдвиги карты запросов не тратят.</p>
+    <label>Ключ Яндекс JS API (телефоны)</label>
+    <input id="keyya" placeholder="Ключ JavaScript API Яндекс Карт" autocomplete="off">
+    <p class="hint">2ГИС по демо-ключу номера не отдаёт. С ключом Яндекса номер и сайт подтягиваются при открытии карточки. Ключ выдаётся бесплатно в кабинете разработчика Яндекса, сервис «JavaScript API и HTTP Геокодер».</p>
     <div class="row2"><button id="m-clear">Очистить кеш</button><button id="m-cancel">Отмена</button><button id="m-save" class="primary">Сохранить</button></div>
   </div>
 </div>
@@ -210,6 +213,7 @@ const settings = {
   get threshold(){ return ls.get('thr', 4); },
   get minrev(){ return ls.get('minrev', 3); },
   get shownorate(){ return ls.get('shownorate', false); },
+  get ykey(){ return ls.get('kya', ''); },
 };
 let active = new Set(CATS.map(c=>c.id));
 let activeChecks = new Set();
@@ -394,6 +398,43 @@ function mergeOsm(elements){
   });
 }
 
+// ---------- Яндекс Карты JS API: телефон и сайт по требованию (нужен ключ) ----------
+let ymapsReady=null;
+function loadYmaps(){
+  if(ymapsReady) return ymapsReady;
+  ymapsReady=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey='+encodeURIComponent(settings.ykey);
+    s.onload=()=>{ try{ ymaps.ready(res); }catch(e){ rej(e); } };
+    s.onerror=()=>rej(new Error('не удалось загрузить API Яндекса'));
+    document.head.appendChild(s);
+  });
+  return ymapsReady;
+}
+async function yandexLookup(p){
+  if(!settings.ykey || p.yaChecked) return false;
+  await loadYmaps();
+  const d=0.003;
+  const res=await ymaps.search(p.name, {results:5, boundedBy:[[p.lat-d,p.lon-d*1.8],[p.lat+d,p.lon+d*1.8]], strictBounds:true});
+  let best=null, bd=150; const nm=norm(p.name);
+  res.geoObjects.each(g=>{
+    const c=g.geometry.getCoordinates(); const dist=map.distance([p.lat,p.lon],c); const gn=norm(g.properties.get('name'));
+    const similar=gn===nm||gn.includes(nm.split(' ')[0])||nm.includes(gn.split(' ')[0]);
+    if(dist<bd && (similar || dist<40)){ best=g; bd=dist; }
+  });
+  p.yaChecked=true;
+  if(best){
+    const m=best.properties.get('CompanyMetaData')||{};
+    const phones=(m.Phones||[]).map(x=>x.formatted).filter(Boolean);
+    if(phones.length){ p.phone=phones[0]; p.phones=phones; }
+    if(m.url && !p.site) p.site=m.url;
+    if(m.id) p.yaId=String(m.id);
+    if(phones.length||m.url) p.source=p.source.includes('Яндекс')?p.source:p.source+' + Яндекс';
+  }
+  saveCache();
+  return !!best;
+}
+
 // ---------- загрузка области ----------
 let loadTimer=null;
 map.on('moveend',()=>{ renderList(); clearTimeout(loadTimer); loadTimer=setTimeout(loadHere,350); });
@@ -493,27 +534,11 @@ async function openCard(id){
     <div class="rbox"><div class="k">Рейтинг 2ГИС</div><div class="v">${p.rating!=null?p.rating.toFixed(1)+' <small>'+p.reviews+' отз.</small>':'<small>нет данных</small>'}</div></div>
     <div class="rbox"><div class="k">Средний чек</div><div class="v">${p.check?p.check+' ₽':'<small>нет данных</small>'}${p.lunch?' <small>ланч от '+p.lunch+' ₽</small>':''}</div></div>
     <div class="rbox"><div class="k">Сейчас</div><div class="v" style="font-size:16px;color:${open===true?'var(--ok)':open===false?'var(--accent)':'var(--ink-3)'}">${open===true?'Открыто':open===false?'Закрыто':'Часы неизвестны'}</div></div>`;
-  const tel=p.phone?'tel:'+p.phone.replace(/[^\d+]/g,''):'';
-  const route=`https://yandex.ru/maps/?rtext=${me?me[0]+','+me[1]:''}~${p.lat},${p.lon}&rtt=pd`;
-  const gisUrl=p.gisId?`https://2gis.ru/firm/${p.gisId}`:`https://2gis.ru/search/${encodeURIComponent(p.name)}?m=${p.lon},${p.lat}/17`;
-  const ya=`https://yandex.ru/maps/?text=${encodeURIComponent(p.name)}&ll=${p.lon},${p.lat}&z=17`;
-  $('c-actions').innerHTML=`
-    <a class="primary ${tel?'':'off'}" href="${tel}"><span>📞</span>${tel?'Позвонить':'Нет номера'}</a>
-    <a data-ext="${esc(route)}"><span>🧭</span>Маршрут</a>
-    <a class="${p.site?'':'off'}" data-ext="${esc(p.site)}"><span>🌐</span>Сайт</a>
-    <a data-ext="${esc(gisUrl)}"><span>🪑</span>Бронь</a>`;
-  const hrs=hoursText(p);
-  $('c-kv').innerHTML=`
-    ${hrs?`<dt>Часы</dt><dd>${esc(hrs)}</dd>`:''}
-    ${p.phone?`<dt>Телефон</dt><dd><a href="${tel}">${esc(p.phone)}</a></dd>`:''}
-    ${p.features.length?`<dt>Особенности</dt><dd>${esc(p.features.join(', '))}</dd>`:''}
-    ${p.extras.length?`<dt>Удобства</dt><dd>${esc(p.extras.join(', '))}</dd>`:''}
-    <dt>Источник</dt><dd>${p.source}${p.osmId?' + OpenStreetMap':''}</dd>`;
+  renderCardContacts(p, !p.phone && !!settings.ykey && !p.yaChecked);
   $('c-menu').innerHTML=p.menu.length?`<div class="sect">В меню</div><div class="tags">${p.menu.map(m=>'<span>'+esc(m)+'</span>').join('')}</div>`:'';
-  $('c-links').innerHTML=`
-    <a data-ext="${esc(gisUrl)}">Отзывы на 2ГИС →</a>
-    <a data-ext="${esc(ya)}">Отзывы на Яндекс Картах →</a>
-    ${p.osmId?`<a data-ext="https://www.openstreetmap.org/${p.osmId}">OpenStreetMap</a>`:''}`;
+  if(!p.phone && settings.ykey && !p.yaChecked){
+    yandexLookup(p).catch(e=>{ status('Яндекс: '+(e.message||'ошибка'), 3000); }).then(()=>{ if(cardId===id) renderCardContacts(p,false); });
+  }
   const ph=$('c-photos'); ph.innerHTML=''; $('c-photos-note').textContent='';
   const imgs=[...p.photos];
   if(!imgs.length){
@@ -529,16 +554,41 @@ async function openCard(id){
   if(imgs.length) ph.innerHTML=imgs.map(u=>`<img src="${u}" alt="" loading="lazy">`).join('');
   else ph.innerHTML='<div class="nophoto">Фото пока нет: 2ГИС по демо-ключу фото не отдаёт, в открытых источниках снимков этого места нет.</div>';
 }
+function renderCardContacts(p, searching){
+  const tel=p.phone?'tel:'+p.phone.replace(/[^\d+]/g,''):'';
+  const route=`https://yandex.ru/maps/?rtext=${me?me[0]+','+me[1]:''}~${p.lat},${p.lon}&rtt=pd`;
+  const gisUrl=p.gisId?`https://2gis.ru/firm/${p.gisId}`:`https://2gis.ru/search/${encodeURIComponent(p.name)}?m=${p.lon},${p.lat}/17`;
+  const ya=p.yaId?`https://yandex.ru/maps/org/${p.yaId}`:`https://yandex.ru/maps/?text=${encodeURIComponent(p.name)}&ll=${p.lon},${p.lat}&z=17`;
+  const phoneBtn = tel ? `<a class="primary" href="${tel}"><span>📞</span>Позвонить</a>`
+    : searching ? `<a class="primary off"><span>📞</span>Ищу номер…</a>`
+    : `<a class="primary" data-ext="${esc(ya)}"><span>📞</span>Номер на Яндексе</a>`;
+  $('c-actions').innerHTML=`${phoneBtn}
+    <a data-ext="${esc(route)}"><span>🧭</span>Маршрут</a>
+    <a class="${p.site?'':'off'}" data-ext="${esc(p.site)}"><span>🌐</span>Сайт</a>
+    <a data-ext="${esc(gisUrl)}"><span>🪑</span>Бронь</a>`;
+  const hrs=hoursText(p);
+  const phones=(p.phones&&p.phones.length?p.phones:(p.phone?[p.phone]:[]));
+  $('c-kv').innerHTML=`
+    ${hrs?`<dt>Часы</dt><dd>${esc(hrs)}</dd>`:''}
+    ${phones.length?`<dt>Телефон</dt><dd>${phones.map(x=>`<a href="tel:${x.replace(/[^\d+]/g,'')}">${esc(x)}</a>`).join('<br>')}</dd>`:''}
+    ${p.features.length?`<dt>Особенности</dt><dd>${esc(p.features.join(', '))}</dd>`:''}
+    ${p.extras.length?`<dt>Удобства</dt><dd>${esc(p.extras.join(', '))}</dd>`:''}
+    <dt>Источник</dt><dd>${p.source}${p.osmId?' + OpenStreetMap':''}</dd>`;
+  $('c-links').innerHTML=`
+    <a data-ext="${esc(gisUrl)}">Отзывы на 2ГИС →</a>
+    <a data-ext="${esc(ya)}">Отзывы на Яндекс Картах →</a>
+    ${p.osmId?`<a data-ext="https://www.openstreetmap.org/${p.osmId}">OpenStreetMap</a>`:''}`;
+}
 function closeCard(){ $('card').classList.remove('open'); cardId=null; if(tg) try{ tg.BackButton.hide(); }catch(e){} }
 $('close').onclick=closeCard;
 $('card').addEventListener('click',e=>{ const a=e.target.closest('a[data-ext]'); if(a&&a.dataset.ext){ e.preventDefault(); openExternal(a.dataset.ext); } });
 $('handle').onclick=()=>$('sheet').classList.toggle('collapsed');
 
 // ---------- настройки ----------
-$('settings').onclick=()=>{ $('key2gis').value=settings.key; $('threshold').value=String(settings.threshold); $('minrev').value=String(settings.minrev); $('shownorate').checked=settings.shownorate; $('reqcount').textContent=ls.get('reqcount',0)||0; $('modal').classList.add('open'); };
+$('settings').onclick=()=>{ $('key2gis').value=settings.key; $('keyya').value=settings.ykey; $('threshold').value=String(settings.threshold); $('minrev').value=String(settings.minrev); $('shownorate').checked=settings.shownorate; $('reqcount').textContent=ls.get('reqcount',0)||0; $('modal').classList.add('open'); };
 $('m-cancel').onclick=()=>$('modal').classList.remove('open');
 $('m-clear').onclick=()=>{ ls.del('places'); ls.del('circles'); places.clear(); circles=[]; $('modal').classList.remove('open'); renderList(); loadHere(); };
-$('m-save').onclick=()=>{ const hadKey=!!settings.key; ls.set('k2gis',$('key2gis').value.trim()); ls.set('thr',parseFloat($('threshold').value)); ls.set('minrev',parseInt($('minrev').value,10)); ls.set('shownorate',$('shownorate').checked); $('modal').classList.remove('open'); renderList(); if(!hadKey) loadHere(); };
+$('m-save').onclick=()=>{ const hadKey=!!settings.key; ls.set('k2gis',$('key2gis').value.trim()); if($('keyya').value.trim()!==settings.ykey){ ls.set('kya',$('keyya').value.trim()); ymapsReady=null; places.forEach(p=>{ delete p.yaChecked; }); } ls.set('thr',parseFloat($('threshold').value)); ls.set('minrev',parseInt($('minrev').value,10)); ls.set('shownorate',$('shownorate').checked); $('modal').classList.remove('open'); renderList(); if(!hadKey) loadHere(); };
 
 // ---------- старт: показать кеш сразу, геолокацию и загрузку запускать параллельно ----------
 map.whenReady(()=>{
