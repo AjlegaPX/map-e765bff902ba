@@ -109,6 +109,11 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
 .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .links a{font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
 .sect{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin:20px 0 8px}
+.ya-embed{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg);min-height:120px;position:relative}
+.ya-embed iframe{display:block;width:100%;height:520px;border:0;background:var(--bg)}
+.ya-embed .ya-load{position:absolute;inset:0;display:grid;place-items:center;color:var(--ink-3);font-size:13px;pointer-events:none}
+.ya-embed .ya-more{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--line);background:var(--paper);font-size:12.5px;color:var(--ink-3)}
+.ya-embed .ya-more a{color:var(--accent);font-weight:600;text-decoration:none;cursor:pointer;white-space:nowrap}
 .rev-src{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
 .rev-head{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-bottom:6px}
 .rev-head span{color:var(--ink-3);font-size:12.5px}
@@ -215,6 +220,8 @@ body.routing .top{display:none}
     <div class="actions" id="c-actions"></div>
     <dl class="kv" id="c-kv"></dl>
     <div id="c-menu"></div>
+    <div class="sect">На Яндекс Картах</div>
+    <div class="ya-embed" id="c-ya"></div>
     <div class="sect">Отзывы</div>
     <div id="c-reviews"></div>
   </div>
@@ -613,6 +620,12 @@ async function openCard(id){
     <div class="rbox"><div class="k">Сейчас</div><div class="v" style="font-size:16px;color:${open===true?'var(--ok)':open===false?'var(--accent)':'var(--ink-3)'}">${open===true?'Открыто':open===false?'Закрыто':'Часы неизвестны'}</div></div>`;
   renderCardContacts(p, !p.phone && !!settings.ykey && !p.yaChecked);
   $('c-menu').innerHTML=p.menu.length?`<div class="sect">В меню</div><div class="tags">${p.menu.map(m=>'<span>'+esc(m)+'</span>').join('')}</div>`:'';
+  // Официальный встраиваемый виджет Яндекс Карт: карточка заведения с телефоном, сайтом, часами и рейтингом Яндекса.
+  // Работает без ключа и без перехода; фото и отзывы открываются по ссылке из него.
+  const yaQuery=p.name+' '+(p.addr||'').split(',').slice(0,2).join(',');
+  const yaFrame=`https://yandex.ru/map-widget/v1/?text=${encodeURIComponent(yaQuery)}&ll=${p.lon},${p.lat}&z=17&mode=search`;
+  $('c-ya').innerHTML=`<div class="ya-load">Загружаю карточку Яндекса…</div><iframe src="${esc(yaFrame)}" loading="lazy" allow="geolocation" title="Карточка на Яндекс Картах" onload="this.previousElementSibling.remove()"></iframe>
+    <div class="ya-more"><span>Телефон, сайт и часы из Яндекс Карт</span><a data-ext="${esc(yaGalleryUrl(p))}">Фото и отзывы →</a></div>`;
   if(!p.phone && settings.ykey && !p.yaChecked){
     yandexLookup(p).catch(e=>{ status('Яндекс: '+(e.message||'ошибка'), 3000); }).then(()=>{ if(cardId===id){ renderCardContacts(p,false); renderPhotos(p); } });
   }
