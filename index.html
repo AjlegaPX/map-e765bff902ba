@@ -32,12 +32,25 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
 .bar input{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-size:16px;min-width:0}
 .bar button{border:0;background:var(--accent);color:#fff;font:inherit;font-weight:600;font-size:14px;padding:8px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}
 .bar button.ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
-.chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none}
+.chips-row{position:relative;margin-top:6px}
+.chips-row:first-of-type{margin-top:8px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:4px 2px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;
+  -webkit-mask:linear-gradient(90deg,#000 0,#000 calc(100% - 36px),transparent 100%);mask:linear-gradient(90deg,#000 0,#000 calc(100% - 36px),transparent 100%)}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:none;background:var(--paper);border:1px solid var(--line);border-radius:99px;padding:6px 12px;font-size:13px;font-weight:500;cursor:pointer;box-shadow:0 1px 4px rgba(20,30,40,.1);user-select:none}
+.chips-row.can-left .chips{-webkit-mask:linear-gradient(90deg,transparent 0,#000 36px,#000 calc(100% - 36px),transparent 100%);mask:linear-gradient(90deg,transparent 0,#000 36px,#000 calc(100% - 36px),transparent 100%)}
+.chips-row.end .chips{-webkit-mask:linear-gradient(90deg,transparent 0,#000 36px,#000 100%);mask:linear-gradient(90deg,transparent 0,#000 36px,#000 100%)}
+.chips-row.end:not(.can-left) .chips{-webkit-mask:none;mask:none}
+.chip{flex:none;scroll-snap-align:start;background:var(--paper);border:1px solid var(--line);border-radius:99px;padding:7px 13px;font-size:13px;font-weight:500;cursor:pointer;box-shadow:0 1px 4px rgba(20,30,40,.1);user-select:none;white-space:nowrap;transition:background .15s,color .15s,transform .1s}
+.chip:active{transform:scale(.96)}
 .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .chip.acc.on{background:var(--accent);border-color:var(--accent)}
-.chip.sep{width:1px;padding:0;border:0;background:var(--line);box-shadow:none;margin:4px 2px}
+.chip.money{font-variant-numeric:tabular-nums}
+.chips-arrow{display:none;position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:18px;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(20,30,40,.15);padding:0}
+.chips-arrow.left{left:-2px}.chips-arrow.right{right:-2px}
+@media (hover:hover) and (pointer:fine){
+  .chips-row.can-left .chips-arrow.left{display:block}
+  .chips-row:not(.end) .chips-arrow.right{display:block}
+}
 .status{display:inline-block;margin-top:6px;background:rgba(26,34,44,.85);color:#fff;font-size:12px;padding:5px 10px;border-radius:8px}
 .status.hidden{display:none}
 
@@ -166,7 +179,8 @@ body.routing .top{display:none}
     <button id="go">Найти</button>
     <button id="settings" class="ghost" title="Настройки">⚙</button>
   </div>
-  <div class="chips" id="chips"></div>
+  <div class="chips-row"><button class="chips-arrow left" data-for="chips1">‹</button><div class="chips" id="chips1"></div><button class="chips-arrow right" data-for="chips1">›</button></div>
+  <div class="chips-row"><button class="chips-arrow left" data-for="chips2">‹</button><div class="chips" id="chips2"></div><button class="chips-arrow right" data-for="chips2">›</button></div>
   <div class="status hidden" id="status"></div>
 </div>
 
@@ -314,14 +328,22 @@ const markers = L.layerGroup().addTo(map);
 map.on('moveend',()=>{ const c=map.getCenter(); ls.set('view',{lat:c.lat,lng:c.lng,z:map.getZoom()}); });
 
 // ---------- чипы ----------
-function chip(text, on, cls, onclick){ const d=document.createElement('div'); d.className='chip'+(on?' on':'')+(cls?' '+cls:''); d.textContent=text; d.onclick=onclick; return d; }
-function renderChips(){
-  const box=$('chips'); box.innerHTML='';
-  box.appendChild(chip('Открыто сейчас', openNow, 'acc', ()=>{openNow=!openNow; renderChips(); renderList();}));
-  CHECKS.forEach(c=>box.appendChild(chip(c.name, activeChecks.has(c.id), '', ()=>{ activeChecks.has(c.id)?activeChecks.delete(c.id):activeChecks.add(c.id); renderChips(); renderList(); })));
-  const sep=document.createElement('div'); sep.className='chip sep'; box.appendChild(sep);
-  CATS.forEach(c=>box.appendChild(chip(c.icon+' '+c.name, active.has(c.id), '', ()=>{ active.has(c.id)?active.delete(c.id):active.add(c.id); renderChips(); renderList(); loadHere(); })));
+function chip(text, on, cls, onclick){ const d=document.createElement('div'); d.className='chip'+(on?' on':'')+(cls?' '+cls:''); d.textContent=text; d.onclick=(e)=>{ onclick(); e.currentTarget.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'}); }; return d; }
+function updateChipsRow(box){
+  const row=box.parentElement; const max=box.scrollWidth-box.clientWidth;
+  row.classList.toggle('can-left', box.scrollLeft>4);
+  row.classList.toggle('end', max<=4 || box.scrollLeft>=max-4);
 }
+function renderChips(){
+  const b1=$('chips1'), b2=$('chips2'); const s1=b1.scrollLeft, s2=b2.scrollLeft; b1.innerHTML=''; b2.innerHTML='';
+  b1.appendChild(chip('Открыто сейчас', openNow, 'acc', ()=>{openNow=!openNow; renderChips(); renderList();}));
+  CHECKS.forEach(c=>b1.appendChild(chip(c.name, activeChecks.has(c.id), 'money', ()=>{ activeChecks.has(c.id)?activeChecks.delete(c.id):activeChecks.add(c.id); renderChips(); renderList(); })));
+  CATS.forEach(c=>b2.appendChild(chip(c.icon+' '+c.name, active.has(c.id), '', ()=>{ active.has(c.id)?active.delete(c.id):active.add(c.id); renderChips(); renderList(); loadHere(); })));
+  b1.scrollLeft=s1; b2.scrollLeft=s2; updateChipsRow(b1); updateChipsRow(b2);
+}
+['chips1','chips2'].forEach(id=>{ const box=$(id); box.addEventListener('scroll',()=>updateChipsRow(box),{passive:true}); });
+document.querySelectorAll('.chips-arrow').forEach(a=>{ a.onclick=()=>{ const box=$(a.dataset.for); box.scrollBy({left:(a.classList.contains('left')?-1:1)*Math.round(box.clientWidth*0.7), behavior:'smooth'}); }; });
+window.addEventListener('resize',()=>{ updateChipsRow($('chips1')); updateChipsRow($('chips2')); });
 renderChips();
 
 // ---------- геолокация: сначала быстрая, потом точная ----------
