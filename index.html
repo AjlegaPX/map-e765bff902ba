@@ -92,6 +92,13 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
 .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .links a{font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
 .sect{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin:20px 0 8px}
+.rev-src{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.rev-head{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;margin-bottom:6px}
+.rev-head span{color:var(--ink-3);font-size:12.5px}
+.rev-note{font-size:13px;color:var(--ink-2);margin:4px 0 8px;line-height:1.45}
+.rev-frame{width:100%;height:420px;border:0;border-radius:8px;background:var(--bg);margin:4px 0 8px}
+.rev-more{display:inline-block;font-size:13px;font-weight:600;color:var(--accent);text-decoration:none;cursor:pointer}
+.rev-osm{display:inline-block;font-size:12.5px;color:var(--ink-3);text-decoration:none;cursor:pointer;margin-top:4px}
 
 .modal{position:absolute;inset:0;z-index:1003;background:rgba(20,30,40,.5);display:none;align-items:center;justify-content:center;padding:16px}
 .modal.open{display:flex}
@@ -150,7 +157,7 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
     <dl class="kv" id="c-kv"></dl>
     <div id="c-menu"></div>
     <div class="sect">Отзывы</div>
-    <div class="links" id="c-links"></div>
+    <div id="c-reviews"></div>
   </div>
 </div>
 
@@ -562,22 +569,34 @@ function renderCardContacts(p, searching){
   const phoneBtn = tel ? `<a class="primary" href="${tel}"><span>📞</span>Позвонить</a>`
     : searching ? `<a class="primary off"><span>📞</span>Ищу номер…</a>`
     : `<a class="primary" data-ext="${esc(ya)}"><span>📞</span>Номер на Яндексе</a>`;
+  const siteSearch=`https://yandex.ru/search/?text=${encodeURIComponent(p.name+' '+p.addr+' официальный сайт')}`;
+  const siteBtn = p.site ? `<a data-ext="${esc(p.site)}"><span>🌐</span>Сайт</a>`
+    : searching ? `<a class="off"><span>🌐</span>Ищу сайт…</a>`
+    : `<a data-ext="${esc(siteSearch)}"><span>🌐</span>Найти сайт</a>`;
   $('c-actions').innerHTML=`${phoneBtn}
     <a data-ext="${esc(route)}"><span>🧭</span>Маршрут</a>
-    <a class="${p.site?'':'off'}" data-ext="${esc(p.site)}"><span>🌐</span>Сайт</a>
+    ${siteBtn}
     <a data-ext="${esc(gisUrl)}"><span>🪑</span>Бронь</a>`;
   const hrs=hoursText(p);
   const phones=(p.phones&&p.phones.length?p.phones:(p.phone?[p.phone]:[]));
   $('c-kv').innerHTML=`
     ${hrs?`<dt>Часы</dt><dd>${esc(hrs)}</dd>`:''}
     ${phones.length?`<dt>Телефон</dt><dd>${phones.map(x=>`<a href="tel:${x.replace(/[^\d+]/g,'')}">${esc(x)}</a>`).join('<br>')}</dd>`:''}
+    ${p.site?`<dt>Сайт</dt><dd><a data-ext="${esc(p.site)}" href="${esc(p.site)}">${esc(p.site.replace(/^https?:\/\//,'').replace(/\/$/,''))}</a></dd>`:''}
     ${p.features.length?`<dt>Особенности</dt><dd>${esc(p.features.join(', '))}</dd>`:''}
-    ${p.extras.length?`<dt>Удобства</dt><dd>${esc(p.extras.join(', '))}</dd>`:''}
-    <dt>Источник</dt><dd>${p.source}${p.osmId?' + OpenStreetMap':''}</dd>`;
-  $('c-links').innerHTML=`
-    <a data-ext="${esc(gisUrl)}">Отзывы на 2ГИС →</a>
-    <a data-ext="${esc(ya)}">Отзывы на Яндекс Картах →</a>
-    ${p.osmId?`<a data-ext="https://www.openstreetmap.org/${p.osmId}">OpenStreetMap</a>`:''}`;
+    ${p.extras.length?`<dt>Удобства</dt><dd>${esc(p.extras.join(', '))}</dd>`:''}`;
+  // отзывы: тексты 2ГИС через API не выдаются, поэтому сводка и переход на вкладку отзывов;
+  // у Яндекса есть официальный встраиваемый виджет отзывов, он работает по id организации
+  const gisReviews=p.gisId?`https://2gis.ru/firm/${p.gisId}/tab/reviews`:gisUrl;
+  const yaReviews=p.yaId?`https://yandex.ru/maps/org/${p.yaId}/reviews/`:ya;
+  $('c-reviews').innerHTML=`
+    <div class="rev-src"><div class="rev-head"><b>2ГИС</b><span>${p.rating!=null?p.rating.toFixed(1)+' · '+p.reviews+' отз.':'нет оценок'}</span></div>
+      <p class="rev-note">Тексты отзывов 2ГИС по API не выдаёт, читаются на сайте.</p>
+      <a class="rev-more" data-ext="${esc(gisReviews)}">Читать отзывы на 2ГИС →</a></div>
+    <div class="rev-src"><div class="rev-head"><b>Яндекс Карты</b><span>${p.yaId?'':'организация не сопоставлена'}</span></div>
+      ${p.yaId?`<iframe class="rev-frame" src="https://yandex.ru/maps-reviews-widget/${esc(p.yaId)}?comments" loading="lazy" title="Отзывы на Яндекс Картах"></iframe>`:`<p class="rev-note">${settings.ykey?'Отзывы появятся после сопоставления с Яндексом.':'С ключом Яндекс JS API в настройках здесь появится встроенная лента отзывов.'}</p>`}
+      <a class="rev-more" data-ext="${esc(yaReviews)}">Читать больше на Яндекс Картах →</a></div>
+    ${p.osmId?`<a class="rev-osm" data-ext="https://www.openstreetmap.org/${p.osmId}">Данные OpenStreetMap</a>`:''}`;
 }
 function closeCard(){ $('card').classList.remove('open'); cardId=null; if(tg) try{ tg.BackButton.hide(); }catch(e){} }
 $('close').onclick=closeCard;
