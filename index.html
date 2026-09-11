@@ -2,10 +2,12 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#A8213D">
 <meta name="robots" content="noindex, nofollow">
 <title>Карта заведений 4+</title>
+<link rel="preconnect" href="https://catalog.api.2gis.com">
+<link rel="preconnect" href="https://tile.openstreetmap.org">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap">
 <style>
@@ -13,20 +15,21 @@
   --bg:#F4F6F8; --paper:#fff; --ink:#1A222C; --ink-2:#4A5563; --ink-3:#7C8794; --line:#D9DFE6;
   --accent:#A8213D; --accent-soft:#F7E6EA; --ok:#1E7A4B; --ok-soft:#E3F2E9; --warn:#9A6400; --warn-soft:#FBF0D6;
   --r-hi:#A8213D; --r-mid:#2E3E52; --r-lo:#6B7A8B; --r-none:#B7C0C9;
+  --top-inset:0px;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);overflow:hidden}
+body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
 #map{position:absolute;inset:0}
 .leaflet-container{font:inherit}
 .leaflet-control-attribution{font-size:10px}
 
-.top{position:absolute;top:0;left:0;right:0;z-index:1000;padding:10px 10px 0;pointer-events:none}
+.top{position:absolute;top:var(--top-inset);left:0;right:0;z-index:1000;padding:10px 10px 0;pointer-events:none}
 .top>*{pointer-events:auto}
 .bar{display:flex;gap:8px;align-items:center;background:var(--paper);border-radius:12px;box-shadow:0 2px 10px rgba(20,30,40,.15);padding:8px 10px}
 .bar .logo{font-weight:700;font-size:15px;white-space:nowrap;padding:0 4px}
 .bar .logo b{color:var(--accent)}
-.bar input{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;min-width:0}
+.bar input{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-size:16px;min-width:0}
 .bar button{border:0;background:var(--accent);color:#fff;font:inherit;font-weight:600;font-size:14px;padding:8px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}
 .bar button.ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
 .chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none}
@@ -40,14 +43,14 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
 
 .locate{position:absolute;right:10px;bottom:66px;z-index:1000;width:44px;height:44px;border-radius:50%;border:0;background:var(--paper);box-shadow:0 2px 10px rgba(20,30,40,.2);cursor:pointer;font-size:20px;display:grid;place-items:center}
 
-.sheet{position:absolute;left:0;right:0;bottom:0;z-index:1001;background:var(--paper);border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(20,30,40,.18);max-height:70vh;display:flex;flex-direction:column;transition:transform .25s}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:1001;background:var(--paper);border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(20,30,40,.18);max-height:70vh;display:flex;flex-direction:column;transition:transform .25s;will-change:transform}
 .sheet.collapsed{transform:translateY(calc(100% - 52px))}
 .sheet .handle{padding:12px 16px 8px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;border-bottom:1px solid var(--line);font-size:14px;font-weight:600;flex:none;position:relative}
 .sheet .handle::before{content:"";position:absolute;left:50%;top:5px;width:36px;height:4px;margin-left:-18px;border-radius:2px;background:var(--line)}
 .sheet .handle span.cnt{color:var(--ink-3);font-weight:500}
-.list{overflow-y:auto;padding:4px 0 env(safe-area-inset-bottom)}
+.list{overflow-y:auto;padding:4px 0 env(safe-area-inset-bottom);-webkit-overflow-scrolling:touch}
 .row{display:grid;grid-template-columns:44px 1fr auto;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);cursor:pointer;align-items:center}
-.row:hover{background:var(--bg)}
+.row:active{background:var(--bg)}
 .row .thumb{width:44px;height:44px;border-radius:8px;background:var(--bg);display:grid;place-items:center;font-size:20px}
 .row .t{font-weight:600;font-size:15px;line-height:1.25}
 .row .s{font-size:12.5px;color:var(--ink-2);margin-top:2px}
@@ -59,9 +62,9 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
 .empty{padding:28px 16px;color:var(--ink-2);font-size:14px;text-align:center;line-height:1.5}
 .empty button{margin-top:10px;border:0;background:var(--accent);color:#fff;font:inherit;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer}
 
-.card{position:absolute;inset:0;z-index:1002;background:var(--paper);overflow-y:auto;display:none}
+.card{position:absolute;inset:0;z-index:1002;background:var(--paper);overflow-y:auto;display:none;-webkit-overflow-scrolling:touch}
 .card.open{display:block}
-.card .back{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--paper);border-bottom:1px solid var(--line)}
+.card .back{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:calc(10px + var(--top-inset)) 12px 10px;background:var(--paper);border-bottom:1px solid var(--line)}
 .card .back button{border:0;background:var(--bg);width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;flex:none}
 .card .back .h{font-weight:700;font-size:16px;line-height:1.2;text-wrap:balance}
 .photos{display:flex;gap:6px;overflow-x:auto;padding:12px 12px 0;scroll-snap-type:x mandatory}
@@ -76,7 +79,7 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
 .rbox .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
 .rbox .v small{font-size:12px;font-weight:500;color:var(--ink-3)}
 .actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
-.actions a{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:10px;background:var(--bg);color:var(--ink);text-decoration:none;font-size:12px;font-weight:600}
+.actions a{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:10px;background:var(--bg);color:var(--ink);text-decoration:none;font-size:12px;font-weight:600;cursor:pointer}
 .actions a.primary{background:var(--accent);color:#fff}
 .actions a.off{opacity:.4;pointer-events:none}
 .actions a span{font-size:20px}
@@ -87,8 +90,7 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
 .tags{display:flex;flex-wrap:wrap;gap:6px}
 .tags span{font-size:12.5px;background:var(--bg);border-radius:6px;padding:4px 8px}
 .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.links a{font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:8px 12px}
-.links a:hover{border-color:var(--ink)}
+.links a{font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
 .sect{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin:20px 0 8px}
 
 .modal{position:absolute;inset:0;z-index:1003;background:rgba(20,30,40,.5);display:none;align-items:center;justify-content:center;padding:16px}
@@ -96,17 +98,15 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
 .modal .box{background:var(--paper);border-radius:14px;padding:18px;max-width:440px;width:100%;font-size:14px;line-height:1.5;max-height:90vh;overflow-y:auto}
 .modal h3{margin:0 0 8px;font-size:17px}
 .modal label{display:block;margin-top:10px;font-weight:600}
-.modal input,.modal select{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;margin:6px 0 4px}
-.modal .row2{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.modal input,.modal select{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;font-size:16px;margin:6px 0 4px}
+.modal .row2{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
 .modal button{border:0;border-radius:8px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer;background:var(--bg)}
 .modal button.primary{background:var(--accent);color:#fff}
 .modal .hint{font-size:12.5px;color:var(--ink-3);margin:2px 0 0}
 .modal .check{display:flex;gap:8px;align-items:center;margin-top:10px;font-weight:500}
 .modal .check input{width:auto;margin:0}
 
-.pin{width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);background:var(--r-none)}
-.pin.hi{background:var(--r-hi);width:18px;height:18px}.pin.mid{background:var(--r-mid)}.pin.lo{background:var(--r-lo)}
-.pin.me{background:#1E7A4B;box-shadow:0 0 0 6px rgba(30,122,75,.25)}
+.pin-me{width:14px;height:14px;border-radius:50%;border:2px solid #fff;background:#1E7A4B;box-shadow:0 0 0 6px rgba(30,122,75,.25)}
 .leaflet-tooltip.lbl{font:600 12px "Golos Text",sans-serif;padding:2px 6px;border-radius:6px}
 
 @media (min-width:900px){
@@ -129,14 +129,14 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
     <button id="settings" class="ghost" title="Настройки">⚙</button>
   </div>
   <div class="chips" id="chips"></div>
-  <div class="status" id="status">Определяю местоположение…</div>
+  <div class="status hidden" id="status"></div>
 </div>
 
 <button class="locate" id="locate" title="Где я">◎</button>
 
 <div class="sheet collapsed" id="sheet">
   <div class="handle" id="handle"><span>Заведения рядом</span><span class="cnt" id="cnt">—</span></div>
-  <div class="list" id="list"><div class="empty">Ищу заведения…</div></div>
+  <div class="list" id="list"><div class="empty">Загружаю…</div></div>
 </div>
 
 <div class="card" id="card">
@@ -171,12 +171,13 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
     <p class="hint">Рейтинг 5,0 по двум отзывам ничего не значит, поэтому мало отзывов тоже отсекается.</p>
     <label class="check"><input type="checkbox" id="shownorate"> Показывать заведения без рейтинга</label>
     <label>Ключ 2ГИС Places API</label>
-    <input id="key2gis" placeholder="Ключ 2ГИС">
-    <p class="hint">Демо-ключ даёт 1 000 запросов. С этого устройства уже сделано: <b id="reqcount">0</b>. Ответы кешируются на сутки.</p>
+    <input id="key2gis" placeholder="Ключ 2ГИС" autocomplete="off">
+    <p class="hint">Демо-ключ даёт 1 000 запросов. С этого устройства сделано: <b id="reqcount">0</b>. Заведения кешируются на сутки, повторные открытия и небольшие сдвиги карты запросов не тратят.</p>
     <div class="row2"><button id="m-clear">Очистить кеш</button><button id="m-cancel">Отмена</button><button id="m-save" class="primary">Сохранить</button></div>
   </div>
 </div>
 
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 // ---------- справочники ----------
@@ -191,16 +192,18 @@ const CATS = [
   {id:'bakery',     name:'Пекарни',     icon:'🥐',  rub:['111594'],       osm:{shop:['bakery','pastry','confectionery']}},
   {id:'deli',       name:'Готовая еда', icon:'🥡',  rub:['16677'],        osm:{shop:['deli']}},
 ];
-const RUB_ALL = CATS.flatMap(c=>c.rub).join(',');
+const CAT_BY_ID = Object.fromEntries(CATS.map(c=>[c.id,c]));
 const CHECKS = [
-  {id:'c1', name:'до 500 ₽',      min:0,    max:500},
-  {id:'c2', name:'500–1000 ₽',    min:500,  max:1000},
-  {id:'c3', name:'1000–2000 ₽',   min:1000, max:2000},
-  {id:'c4', name:'от 2000 ₽',     min:2000, max:1e9},
+  {id:'c1', name:'до 500 ₽',    min:0,    max:500},
+  {id:'c2', name:'500–1000 ₽',  min:500,  max:1000},
+  {id:'c3', name:'1000–2000 ₽', min:1000, max:2000},
+  {id:'c4', name:'от 2000 ₽',   min:2000, max:1e9},
 ];
+const DAY_MS = 86400e3;
 const ls = {
   get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d} },
   set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} },
 };
 const settings = {
   get key(){ return ls.get('k2gis', DEFAULT_KEY) || DEFAULT_KEY; },
@@ -211,20 +214,47 @@ const settings = {
 let active = new Set(CATS.map(c=>c.id));
 let activeChecks = new Set();
 let openNow = false;
-let places = new Map();   // id -> place, накапливается за сессию
-let me = null;
-let markers = L.layerGroup();
-let meMarker = null;
+let places = new Map();          // id -> place (в памяти + копия в localStorage)
+let circles = ls.get('circles', []).filter(c=>Date.now()-c.t<DAY_MS);   // загруженные области
+let me = null, meMarker = null, meAccuracy = null;
 let loadSeq = 0;
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let statusTimer=null;
+const status = (t, ms) => { const s=$('status'); clearTimeout(statusTimer); if(!t){s.classList.add('hidden');return} s.textContent=t; s.classList.remove('hidden'); if(ms) statusTimer=setTimeout(()=>s.classList.add('hidden'),ms); };
+
+// ---------- Telegram Mini App ----------
+const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData !== undefined ? window.Telegram.WebApp : null;
+const inTelegram = !!(tg && tg.initDataUnsafe && tg.initDataUnsafe.user);
+if(tg){
+  try{ tg.ready(); tg.expand(); }catch(e){}
+  try{ tg.setHeaderColor && tg.setHeaderColor('#A8213D'); }catch(e){}
+  try{ tg.disableVerticalSwipes && tg.disableVerticalSwipes(); }catch(e){}
+  try{ tg.BackButton.onClick(()=>closeCard()); }catch(e){}
+}
+function openExternal(url){ if(tg && tg.openLink){ try{ tg.openLink(url); return; }catch(e){} } window.open(url,'_blank','noopener'); }
+
+// ---------- кеш заведений ----------
+function thaw(o){ o.cat=CAT_BY_ID[o.catId]||CATS[1]; return o; }
+function freeze(p){ const {cat, ...rest}=p; rest.catId=cat.id; return rest; }
+(function loadCache(){
+  const arr=ls.get('places', []); const now=Date.now();
+  arr.forEach(o=>{ if(now-(o.t||0)<DAY_MS) places.set(o.id, thaw(o)); });
+})();
+let saveTimer=null;
+function saveCache(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>{
+  let arr=[...places.values()].map(freeze);
+  if(arr.length>4000) arr=arr.sort((a,b)=>(b.t||0)-(a.t||0)).slice(0,4000);
+  ls.set('places', arr); ls.set('circles', circles);
+},800); }
 
 // ---------- карта ----------
-const map = L.map('map', {zoomControl:false}).setView([56.36, 41.31], 14);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'© участники <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · данные о заведениях: <a href="https://2gis.ru">2ГИС</a>'}).addTo(map);
-L.control.zoom({position:'topright'}).addTo(map);
-markers.addTo(map);
-const $ = id => document.getElementById(id);
-const status = t => { const s=$('status'); if(!t){s.classList.add('hidden');return} s.textContent=t; s.classList.remove('hidden'); };
-const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const lastView = ls.get('view', null);
+const map = L.map('map', {zoomControl:false, preferCanvas:true, tap:false}).setView(lastView?[lastView.lat,lastView.lng]:[56.36,41.31], lastView?lastView.z:14);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, keepBuffer:4, updateWhenIdle:true, attribution:'© участники <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · данные: <a href="https://2gis.ru">2ГИС</a>'}).addTo(map);
+if(!inTelegram) L.control.zoom({position:'topright'}).addTo(map);
+const markers = L.layerGroup().addTo(map);
+map.on('moveend',()=>{ const c=map.getCenter(); ls.set('view',{lat:c.lat,lng:c.lng,z:map.getZoom()}); });
 
 // ---------- чипы ----------
 function chip(text, on, cls, onclick){ const d=document.createElement('div'); d.className='chip'+(on?' on':'')+(cls?' '+cls:''); d.textContent=text; d.onclick=onclick; return d; }
@@ -233,25 +263,39 @@ function renderChips(){
   box.appendChild(chip('Открыто сейчас', openNow, 'acc', ()=>{openNow=!openNow; renderChips(); renderList();}));
   CHECKS.forEach(c=>box.appendChild(chip(c.name, activeChecks.has(c.id), '', ()=>{ activeChecks.has(c.id)?activeChecks.delete(c.id):activeChecks.add(c.id); renderChips(); renderList(); })));
   const sep=document.createElement('div'); sep.className='chip sep'; box.appendChild(sep);
-  CATS.forEach(c=>box.appendChild(chip(c.icon+' '+c.name, active.has(c.id), '', ()=>{ active.has(c.id)?active.delete(c.id):active.add(c.id); renderChips(); renderList(); })));
+  CATS.forEach(c=>box.appendChild(chip(c.icon+' '+c.name, active.has(c.id), '', ()=>{ active.has(c.id)?active.delete(c.id):active.add(c.id); renderChips(); renderList(); loadHere(); })));
 }
 renderChips();
 
-// ---------- геолокация ----------
+// ---------- геолокация: сначала быстрая, потом точная ----------
+function setMe(lat, lon, acc, moveMap){
+  me=[lat,lon]; meAccuracy=acc; ls.set('me',{lat,lon,t:Date.now()});
+  if(meMarker) meMarker.setLatLng(me); else meMarker=L.marker(me,{icon:L.divIcon({className:'',html:'<div class="pin-me"></div>',iconSize:[14,14],iconAnchor:[7,7]}),zIndexOffset:1000,interactive:false}).addTo(map);
+  if(moveMap) map.setView(me, Math.max(map.getZoom(),15));
+  renderList();
+}
 function locate(first){
-  if(!navigator.geolocation){ status('Геолокация недоступна'); loadHere(); return; }
-  status('Определяю местоположение…');
-  navigator.geolocation.getCurrentPosition(p=>{
-    me=[p.coords.latitude, p.coords.longitude];
-    if(meMarker) meMarker.setLatLng(me); else meMarker=L.marker(me,{icon:L.divIcon({className:'',html:'<div class="pin me"></div>',iconSize:[14,14],iconAnchor:[7,7]}),zIndexOffset:1000}).addTo(map);
-    const before=map.getCenter(), zb=map.getZoom();
-    map.setView(me, first?15:map.getZoom());
-    if(map.getCenter().equals(before) && map.getZoom()===zb) loadHere();
-    status('Точность '+Math.round(p.coords.accuracy)+' м'); setTimeout(()=>status(''),2500);
-  }, err=>{
-    status('Геолокация недоступна: '+(err.code===1?'нет разрешения':err.message)); setTimeout(()=>status(''),3500);
-    loadHere();
-  }, {enableHighAccuracy:true, timeout:10000, maximumAge:30000});
+  const onOk=(lat,lon,acc)=>{ const far=!me || map.distance([lat,lon], map.getCenter())>1500; setMe(lat,lon,acc, first?far:true); status('Точность '+Math.round(acc||0)+' м', 2000); };
+  const onErr=(msg)=>{ status('Геолокация: '+msg, 3500); };
+  // Telegram даёт точную геолокацию через своё API (Bot API 8.0+)
+  if(tg && tg.LocationManager && tg.isVersionAtLeast && tg.isVersionAtLeast('8.0')){
+    try{
+      tg.LocationManager.init(()=>{
+        if(!tg.LocationManager.isLocationAvailable){ browserLocate(); return; }
+        tg.LocationManager.getLocation(d=>{ if(d) onOk(d.latitude, d.longitude, d.horizontal_accuracy); else { if(!first) tg.LocationManager.openSettings && tg.LocationManager.openSettings(); browserLocate(); } });
+      });
+      return;
+    }catch(e){}
+  }
+  browserLocate();
+  function browserLocate(){
+    if(!navigator.geolocation){ onErr('недоступна'); return; }
+    let done=false;
+    navigator.geolocation.getCurrentPosition(p=>{ if(done) return; onOk(p.coords.latitude,p.coords.longitude,p.coords.accuracy); },
+      ()=>{}, {enableHighAccuracy:false, timeout:3000, maximumAge:600000});
+    navigator.geolocation.getCurrentPosition(p=>{ done=true; onOk(p.coords.latitude,p.coords.longitude,p.coords.accuracy); },
+      err=>{ if(!me) onErr(err.code===1?'нет разрешения':'не удалось определить'); }, {enableHighAccuracy:true, timeout:12000, maximumAge:0});
+  }
 }
 $('locate').onclick=()=>locate(false);
 
@@ -261,193 +305,187 @@ async function geocode(q){
   try{
     const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=ru&countrycodes=ru&q='+encodeURIComponent(q));
     const j=await r.json();
-    if(!j.length){ status('Ничего не найдено'); setTimeout(()=>status(''),2500); return; }
-    map.setView([+j[0].lat,+j[0].lon], (j[0].class==='place'||j[0].type==='city')?14:16);
-    status('');
-  }catch(e){ status('Поиск адреса недоступен'); }
+    if(!j.length){ status('Ничего не найдено', 2500); return; }
+    map.setView([+j[0].lat,+j[0].lon], (j[0].class==='place'||j[0].type==='city')?14:16); status('');
+  }catch(e){ status('Поиск адреса недоступен', 3000); }
 }
-$('go').onclick=()=>{ const q=$('q').value.trim(); if(q) geocode(q); };
+$('go').onclick=()=>{ const q=$('q').value.trim(); if(q){ $('q').blur(); geocode(q); } };
 $('q').addEventListener('keydown',e=>{ if(e.key==='Enter') $('go').onclick(); });
 
 // ---------- 2ГИС Places API ----------
-const FIELDS='items.point,items.reviews,items.schedule,items.attribute_groups,items.rubrics,items.contact_groups';
+const FIELDS='items.point,items.reviews,items.schedule,items.attribute_groups,items.rubrics';
 function bumpReq(){ ls.set('reqcount', (ls.get('reqcount',0)||0)+1); }
 async function gis(params){
-  const key=settings.key;
-  const u='https://catalog.api.2gis.com/3.0/items?'+new URLSearchParams({...params, key}).toString();
+  const u='https://catalog.api.2gis.com/3.0/items?'+new URLSearchParams({...params, key:settings.key}).toString();
   const r=await fetch(u); bumpReq();
   const j=await r.json();
   if(j.meta?.code===404) return {items:[], total:0};
   if(j.meta?.code!==200) throw new Error(j.meta?.error?.message||('код '+j.meta?.code));
   return j.result;
 }
-function parseCheck(item){
+function parseAttrs(item){
   let check=null, lunch=null, features=[], menu=[], extras=[];
-  (item.attribute_groups||[]).forEach(g=>{
-    (g.attributes||[]).forEach(a=>{
-      const n=(a.name||'').replace(/ /g,' ');
-      let m;
-      if((m=/^Чек\s*(\d[\d ]*)/.exec(n))) check=parseInt(m[1].replace(/ /g,''),10);
-      else if((m=/^Ланч от\s*(\d[\d ]*)/.exec(n))) lunch=parseInt(m[1].replace(/ /g,''),10);
-      else if(g.name==='Меню') menu.push(n);
-      else if(g.name==='Ресторан / Кафе' || g.name==='Напитки') features.push(n);
-      else if(g.name==='Дополнительно' || g.name==='Услуги') extras.push(n);
-    });
-  });
-  return {check, lunch, features, menu, extras};
+  (item.attribute_groups||[]).forEach(g=>(g.attributes||[]).forEach(a=>{
+    const n=(a.name||'').replace(/ /g,' '); let m;
+    if((m=/^Чек\s*(\d[\d ]*)/.exec(n))) check=parseInt(m[1].replace(/ /g,''),10);
+    else if((m=/^Ланч от\s*(\d[\d ]*)/.exec(n))) lunch=parseInt(m[1].replace(/ /g,''),10);
+    else if(g.name==='Меню') menu.push(n);
+    else if(g.name==='Ресторан / Кафе'||g.name==='Напитки') features.push(n);
+    else if(g.name==='Дополнительно'||g.name==='Услуги') extras.push(n);
+  }));
+  return {check,lunch,features,menu,extras};
 }
-function catFromRubrics(rubrics){
-  const ids=(rubrics||[]).map(r=>String(r.id));
-  for(const c of CATS) if(c.rub.some(id=>ids.includes(id))) return c;
-  return CATS[1];
-}
+function catFromRubrics(rubrics){ const ids=(rubrics||[]).map(r=>String(r.id)); for(const c of CATS) if(c.rub.some(id=>ids.includes(id))) return c; return CATS[1]; }
 function gisToPlace(it){
-  const r=it.reviews||{}; const a=parseCheck(it);
-  const phone=(it.contact_groups||[]).flatMap(g=>g.contacts||[]).find(c=>c.type==='phone')?.value||'';
-  const site=(it.contact_groups||[]).flatMap(g=>g.contacts||[]).find(c=>c.type==='website')?.url||'';
-  return {
-    id:'2gis/'+it.id, gisId:String(it.id).split('_')[0], name:it.name, cat:catFromRubrics(it.rubrics),
-    lat:it.point.lat, lon:it.point.lon, addr:[it.address_name, it.address_comment].filter(Boolean).join(', '),
-    rubrics:(it.rubrics||[]).map(x=>x.name), rating: r.general_rating ?? null, reviews: r.general_review_count ?? 0,
+  const r=it.reviews||{}; const a=parseAttrs(it);
+  return { id:'2gis/'+it.id, gisId:String(it.id).split('_')[0], name:it.name, cat:catFromRubrics(it.rubrics),
+    lat:it.point.lat, lon:it.point.lon, addr:[it.address_name,it.address_comment].filter(Boolean).join(', '),
+    rubrics:(it.rubrics||[]).map(x=>x.name), rating:r.general_rating??null, reviews:r.general_review_count??0,
     check:a.check, lunch:a.lunch, features:a.features, menu:a.menu, extras:a.extras,
-    schedule:it.schedule||null, phone, site, source:'2ГИС', photos:[]
-  };
+    schedule:it.schedule||null, phone:'', site:'', source:'2ГИС', photos:[], t:Date.now() };
 }
-function cacheKey(c, radius, cat){ return 'q:'+c.lat.toFixed(3)+','+c.lng.toFixed(3)+':'+radius+':'+cat; }
-// Демо-ключ 2ГИС: не больше 10 объектов на страницу и не больше 5 страниц,
-// поэтому каждая категория запрашивается отдельно (до 50 ближайших объектов).
-async function fetchGisArea(c, radius, isStale){
-  const all=[]; let total=0, truncated=false, fromCache=true, lastErr=null;
-  for(const cat of CATS){
-    if(!active.has(cat.id)) continue;
-    const ck=cacheKey(c,radius,cat.id); const cached=ls.get(ck,null);
-    if(cached && Date.now()-cached.t < 86400e3){ cached.items.forEach(i=>all.push(i)); total+=cached.total; if(cached.total>cached.items.length) truncated=true; continue; }
-    fromCache=false;
-    const items=[]; let catTotal=0;
-    for(let page=1; page<=5; page++){
-      if(isStale && isStale()) throw new Error('stale');
-      try{
-        const res=await gis({rubric_id:cat.rub.join(','), point:c.lng+','+c.lat, radius, sort:'distance', page_size:10, page, fields:FIELDS});
-        catTotal=res.total||0; (res.items||[]).forEach(i=>items.push(i));
-        status('2ГИС: '+cat.name.toLowerCase()+' '+items.length+' из '+catTotal+'…');
-        if(items.length>=catTotal || !(res.items||[]).length) break;
-      }catch(e){ lastErr=e; break; }
-    }
-    if(!lastErr) ls.set(ck,{t:Date.now(), items, total:catTotal});
-    items.forEach(i=>all.push(i)); total+=catTotal; if(catTotal>items.length) truncated=true;
+function mergePlace(p){ const old=places.get(p.id); if(old){ p.phone=p.phone||old.phone; p.site=p.site||old.site; p.photos=old.photos.length?old.photos:p.photos; p.osmId=old.osmId; } places.set(p.id,p); }
+
+// Демо-ключ: ≤10 объектов на страницу, ≤5 страниц. Категории грузятся параллельно,
+// страницы 2–5 тоже параллельно, как только известен total. Список обновляется по мере прихода.
+async function fetchCategory(cat, c, radius, isStale, onProgress){
+  const base={rubric_id:cat.rub.join(','), point:c.lng+','+c.lat, radius, sort:'distance', page_size:10, fields:FIELDS};
+  const first=await gis({...base, page:1}); if(isStale()) return null;
+  const items=[...(first.items||[])]; const total=first.total||0;
+  onProgress(items);
+  const pages=Math.min(5, Math.ceil(total/10));
+  if(pages>1){
+    const rest=await Promise.all(Array.from({length:pages-1},(_,i)=>gis({...base, page:i+2}).catch(()=>({items:[]}))));
+    if(isStale()) return null;
+    rest.forEach(r=>{ (r.items||[]).forEach(i=>items.push(i)); });
+    onProgress(items);
   }
-  if(lastErr && !all.length) throw lastErr;
-  if(lastErr) { status('2ГИС: '+lastErr.message); }
-  return {items:all, fromCache, total, truncated};
+  return {items, total, truncated: total>items.length};
 }
+function circleCovers(c, center, halfDiag){ return map.distance([c.lat,c.lng],[center.lat,center.lng]) + halfDiag <= (c.partial? c.r/2.5 : c.r); }
 
 // ---------- OSM: телефоны и точки, которых нет в 2ГИС ----------
 const OVERPASS=['https://maps.mail.ru/osm/tools/overpass/api/interpreter','https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
-async function fetchOsm(b){
-  const bbox=[b.getSouth(),b.getWest(),b.getNorth(),b.getEast()].map(v=>v.toFixed(5)).join(',');
-  const am=new Set(), sh=new Set(); CATS.forEach(c=>{(c.osm.amenity||[]).forEach(v=>am.add(v));(c.osm.shop||[]).forEach(v=>sh.add(v));});
-  const q=`[out:json][timeout:20];(nwr["amenity"~"^(${[...am].join('|')})$"](${bbox});nwr["shop"~"^(${[...sh].join('|')})$"](${bbox}););out center tags;`;
+async function fetchOsm(c, radius){
+  const am=new Set(), sh=new Set(); CATS.forEach(k=>{(k.osm.amenity||[]).forEach(v=>am.add(v));(k.osm.shop||[]).forEach(v=>sh.add(v));});
+  const around=`(around:${radius},${c.lat},${c.lng})`;
+  const q=`[out:json][timeout:15];(nwr["amenity"~"^(${[...am].join('|')})$"]${around};nwr["shop"~"^(${[...sh].join('|')})$"]${around};);out center tags;`;
   for(const url of OVERPASS){
-    try{ const r=await fetch(url,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}}); if(r.ok) return (await r.json()).elements||[]; }catch(e){}
+    try{ const ctrl=new AbortController(); const tm=setTimeout(()=>ctrl.abort(),15000);
+      const r=await fetch(url,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctrl.signal}); clearTimeout(tm);
+      if(r.ok) return (await r.json()).elements||[]; }catch(e){}
   }
   return [];
 }
 const norm=s=>(s||'').toLowerCase().replace(/ё/g,'е').replace(/[^a-zа-я0-9]+/g,' ').trim();
 function mergeOsm(elements){
+  const gisList=[...places.values()].filter(p=>p.source==='2ГИС');
   elements.forEach(el=>{
     const t=el.tags||{}; const lat=el.lat??el.center?.lat, lon=el.lon??el.center?.lon; if(lat==null) return;
     const name=t['name:ru']||t.name||t.brand||''; if(!name) return;
     const nm=norm(name); let best=null, bd=70;
-    places.forEach(p=>{ const d=map.distance([p.lat,p.lon],[lat,lon]); if(d<bd){ const pn=norm(p.name); if(pn===nm||pn.includes(nm)||nm.includes(pn)){best=p;bd=d;} } });
+    for(const p of gisList){ if(Math.abs(p.lat-lat)>0.001||Math.abs(p.lon-lon)>0.002) continue; const d=map.distance([p.lat,p.lon],[lat,lon]); if(d<bd){ const pn=norm(p.name); if(pn===nm||pn.includes(nm)||nm.includes(pn)){best=p;bd=d;} } }
     const phone=t.phone||t['contact:phone']||'', site=t.website||t['contact:website']||'';
     const image=t.image&&/^https?:\/\//.test(t.image)?t.image:null;
     if(best){ if(!best.phone&&phone) best.phone=phone; if(!best.site&&site) best.site=site; if(image&&!best.photos.length) best.photos.push(image); best.osmId=el.type+'/'+el.id; return; }
-    let cat=null; for(const c of CATS){ if((c.osm.amenity||[]).includes(t.amenity)||(c.osm.shop||[]).includes(t.shop)){cat=c;break;} } if(!cat) return;
+    let cat=null; for(const k of CATS){ if((k.osm.amenity||[]).includes(t.amenity)||(k.osm.shop||[]).includes(t.shop)){cat=k;break;} } if(!cat) return;
     const id='osm/'+el.type+'/'+el.id;
-    if(!places.has(id)) places.set(id,{id, osmId:el.type+'/'+el.id, name, cat, lat, lon, addr:[t['addr:street'],t['addr:housenumber']].filter(Boolean).join(', '), rubrics:[], rating:null, reviews:0, check:null, lunch:null, features:[], menu:[], extras:[], schedule:null, hours:t.opening_hours||'', phone, site, source:'OSM', photos:image?[image]:[]});
+    if(!places.has(id)) places.set(id,{id, osmId:el.type+'/'+el.id, name, cat, lat, lon, addr:[t['addr:street'],t['addr:housenumber']].filter(Boolean).join(', '), rubrics:[], rating:null, reviews:0, check:null, lunch:null, features:[], menu:[], extras:[], schedule:null, hours:t.opening_hours||'', phone, site, source:'OSM', photos:image?[image]:[], t:Date.now()});
   });
 }
 
 // ---------- загрузка области ----------
 let loadTimer=null;
-map.on('moveend',()=>{ clearTimeout(loadTimer); loadTimer=setTimeout(loadHere,500); });
+map.on('moveend',()=>{ renderList(); clearTimeout(loadTimer); loadTimer=setTimeout(loadHere,350); });
+map.on('resize',()=>renderList());
 async function loadHere(){
   map.invalidateSize();
   if(map.getSize().x===0){ setTimeout(loadHere,300); return; }
-  if(map.getZoom()<12){ $('list').innerHTML='<div class="empty">Приблизьте карту, чтобы увидеть заведения</div>'; $('cnt').textContent='—'; markers.clearLayers(); return; }
+  if(map.getZoom()<12){ status('Приблизьте карту, чтобы увидеть заведения', 2500); return; }
   if(!settings.key){ status(''); $('cnt').textContent='—'; $('list').innerHTML='<div class="empty">Нужен ключ 2ГИС Places API: без него нет рейтингов и списка заведений.<br><button onclick="$(\'settings\').onclick()">Ввести ключ</button></div>'; $('sheet').classList.remove('collapsed'); return; }
-  const seq=++loadSeq; const b=map.getBounds(); const c=b.getCenter();
-  const radius=Math.max(400, Math.min(5000, Math.round(map.distance(b.getNorthWest(), b.getSouthEast())/2/100)*100));
+  const b=map.getBounds(), center=b.getCenter();
+  const halfDiag=map.distance(b.getNorthWest(), b.getSouthEast())/2;
+  const need=CATS.filter(k=>active.has(k.id) && !circles.some(c=>c.cat===k.id && Date.now()-c.t<DAY_MS && circleCovers(c, center, halfDiag)));
+  if(!need.length) return;                       // область уже загружена
+  const seq=++loadSeq; const isStale=()=>seq!==loadSeq;
+  const radius=Math.max(500, Math.min(5000, Math.round(halfDiag*1.8/250)*250));   // запас, чтобы сдвиг на полэкрана не требовал запросов
   status('Запрашиваю 2ГИС…');
-  try{
-    const res=await fetchGisArea(c, radius, ()=>seq!==loadSeq);
-    if(seq!==loadSeq) return;
-    res.items.forEach(it=>{ if(!it.point) return; const p=gisToPlace(it); const old=places.get(p.id); if(old){ p.phone=p.phone||old.phone; p.site=p.site||old.site; p.photos=old.photos; } places.set(p.id,p); });
-    status(res.fromCache?'':'');
-    renderList();
-    fetchOsm(b).then(els=>{ if(seq!==loadSeq) return; mergeOsm(els); renderList(); });
-    if(res.truncated) { status('Показаны ближайшие '+res.items.length+' из '+res.total+', приблизьте карту'); setTimeout(()=>status(''),4000); }
-  }catch(e){
-    if(seq!==loadSeq || e.message==='stale') return;
-    status('2ГИС: '+e.message);
-    $('list').innerHTML='<div class="empty">Не удалось получить данные 2ГИС: '+esc(e.message)+'<br><button onclick="loadHere()">Повторить</button></div>';
-  }
+  let truncated=false, errors=0, lastErr='';
+  const jobs=need.map(cat=>fetchCategory(cat, center, radius, isStale, items=>{ items.forEach(it=>{ if(it.point) mergePlace(gisToPlace(it)); }); renderList(); })
+    .then(res=>{ if(res){ circles.push({cat:cat.id, lat:center.lat, lng:center.lng, r:radius, partial:res.truncated, t:Date.now()}); if(res.truncated) truncated=true; } })
+    .catch(e=>{ errors++; lastErr=e.message; }));
+  const osmJob=fetchOsm(center, radius).then(els=>{ if(!isStale()){ mergeOsm(els); renderList(); saveCache(); } });
+  await Promise.all(jobs);
+  if(isStale()) return;
+  circles=circles.filter(c=>Date.now()-c.t<DAY_MS); saveCache(); renderList();
+  if(errors && errors===need.length){ status('2ГИС: '+lastErr, 5000); if(!places.size) $('list').innerHTML='<div class="empty">Не удалось получить данные 2ГИС: '+esc(lastErr)+'<br><button onclick="loadHere()">Повторить</button></div>'; }
+  else if(truncated) status('Показаны ближайшие заведения, для остальных приблизьте карту', 3000);
+  else status('');
+  osmJob.catch(()=>{});
 }
 
 // ---------- часы работы ----------
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], RU={Mon:'Пн',Tue:'Вт',Wed:'Ср',Thu:'Чт',Fri:'Пт',Sat:'Сб',Sun:'Вс'};
 function isOpenNow(p){
-  const s=p.schedule; if(!s) return null;
+  const s=p.schedule; if(!s) return null; if(s.is_24x7) return true;
   const now=new Date(); const cur=now.getHours()*60+now.getMinutes();
   const chk=(dayKey, offset)=>{ const d=s[dayKey]; if(!d||!d.working_hours) return false;
     return d.working_hours.some(h=>{ const [a1,a2]=h.from.split(':').map(Number), [b1,b2]=h.to.split(':').map(Number); let a=a1*60+a2, b=b1*60+b2; if(b<=a) b+=1440; const t=cur+offset; return t>=a&&t<b; }); };
-  if(s.is_24x7) return true;
   return chk(DAYS[now.getDay()],0) || chk(DAYS[(now.getDay()+6)%7],1440);
 }
 function hoursText(p){
-  const s=p.schedule; if(!s) return p.hours||'';
-  if(s.is_24x7) return 'Круглосуточно';
+  const s=p.schedule; if(!s) return p.hours||''; if(s.is_24x7) return 'Круглосуточно';
   const fmt=d=>(s[d]?.working_hours||[]).map(h=>h.from+'–'+h.to).join(', ')||'выходной';
   const groups=[]; ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(d=>{ const v=fmt(d); const g=groups[groups.length-1]; if(g&&g.v===v) g.days.push(d); else groups.push({v,days:[d]}); });
   return groups.map(g=>(g.days.length>1?RU[g.days[0]]+'–'+RU[g.days[g.days.length-1]]:RU[g.days[0]])+' '+g.v).join('; ');
 }
 
 // ---------- список и маркеры ----------
+const COLORS={hi:'#A8213D', mid:'#2E3E52', lo:'#6B7A8B', none:'#B7C0C9'};
 function rateClass(r){ if(r==null) return 'none'; if(r>=4.7) return 'hi'; if(r>=4.3) return 'mid'; return 'lo'; }
 function fmtDist(m){ return m<1000? Math.round(m)+' м' : (m/1000).toFixed(1)+' км'; }
 function visiblePlaces(){
-  const thr=settings.threshold, minrev=settings.minrev, b=map.getBounds();
-  return [...places.values()]
-    .filter(p=>b.contains([p.lat,p.lon]) && active.has(p.cat.id))
-    .filter(p=> p.rating==null ? settings.shownorate : (p.rating>=thr && p.reviews>=minrev))
-    .filter(p=>!activeChecks.size || (p.check!=null && [...activeChecks].some(id=>{const c=CHECKS.find(x=>x.id===id); return p.check>=c.min && p.check<c.max;})))
-    .filter(p=>!openNow || isOpenNow(p)===true)
-    .map(p=>({...p, dist: map.distance(me||map.getCenter(),[p.lat,p.lon]), score: p.rating==null?-1:(p.reviews*p.rating+10*4.2)/(p.reviews+10)}))
-    .sort((a,b)=>b.score-a.score || a.dist-b.dist);  // сглаженный рейтинг: мало отзывов тянет к среднему 4,2
+  const thr=settings.threshold, minrev=settings.minrev, b=map.getBounds(), from=me||map.getCenter();
+  const out=[];
+  for(const p of places.values()){
+    if(!b.contains([p.lat,p.lon]) || !active.has(p.cat.id)) continue;
+    if(p.rating==null ? !settings.shownorate : (p.rating<thr || p.reviews<minrev)) continue;
+    if(activeChecks.size && !(p.check!=null && [...activeChecks].some(id=>{const c=CHECKS.find(x=>x.id===id); return p.check>=c.min && p.check<c.max;}))) continue;
+    if(openNow && isOpenNow(p)!==true) continue;
+    out.push({...p, dist:map.distance(from,[p.lat,p.lon]), score:p.rating==null?-1:(p.reviews*p.rating+10*4.2)/(p.reviews+10)});
+  }
+  return out.sort((a,b)=>b.score-a.score || a.dist-b.dist);   // сглаженный рейтинг: мало отзывов тянет к среднему 4,2
 }
-function renderList(){
-  const v=visiblePlaces(); const list=$('list'); list.innerHTML=''; markers.clearLayers();
-  const total=[...places.values()].filter(p=>map.getBounds().contains([p.lat,p.lon])).length;
+let renderRaf=null;
+function renderList(){ if(renderRaf) return; renderRaf=requestAnimationFrame(()=>{ renderRaf=null; renderListNow(); }); }
+function renderListNow(){
+  const v=visiblePlaces(); const list=$('list'); markers.clearLayers();
+  const b=map.getBounds(); let total=0; for(const p of places.values()) if(b.contains([p.lat,p.lon])) total++;
   $('cnt').textContent=v.length+' из '+total;
-  if(!v.length){ list.innerHTML='<div class="empty">'+(total?'Под фильтры ничего не попало. Порог рейтинга и минимум отзывов можно изменить в настройках.':'В этой области заведений нет')+'</div>'; return; }
-  v.forEach(p=>{
-    const row=document.createElement('div'); row.className='row';
+  if(!v.length){ list.innerHTML='<div class="empty">'+(total?'Под фильтры ничего не попало. Порог рейтинга и минимум отзывов можно изменить в настройках.':'Заведения загружаются или их здесь нет')+'</div>'; return; }
+  const frag=document.createDocumentFragment();
+  v.slice(0,150).forEach(p=>{
+    const row=document.createElement('div'); row.className='row'; row.dataset.id=p.id;
     row.innerHTML=`<div class="thumb">${p.cat.icon}</div>
       <div><div class="t">${esc(p.name)}</div><div class="s">${esc(p.rubrics.slice(0,2).join(', ')||p.cat.name)}${p.addr?' · '+esc(p.addr):''}</div></div>
       <div class="r"><span class="rate ${rateClass(p.rating)}">${p.rating!=null?p.rating.toFixed(1):'нет рейтинга'}</span><div class="sub">${p.rating!=null?p.reviews+' отз.':''}${p.check?' · '+p.check+' ₽':''}</div><div class="sub">${fmtDist(p.dist)}</div></div>`;
-    row.onclick=()=>openCard(p.id);
-    list.appendChild(row);
-    const mk=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'',html:`<div class="pin ${rateClass(p.rating)}"></div>`,iconSize:[16,16],iconAnchor:[8,8]})});
+    frag.appendChild(row);
+    const cls=rateClass(p.rating);
+    const mk=L.circleMarker([p.lat,p.lon],{radius:cls==='hi'?8:7, color:'#fff', weight:2, fillColor:COLORS[cls], fillOpacity:1});
     mk.bindTooltip(p.name+(p.rating!=null?' · '+p.rating.toFixed(1):''),{className:'lbl',direction:'top',offset:[0,-8]});
     mk.on('click',()=>openCard(p.id));
     markers.addLayer(mk);
   });
+  list.innerHTML=''; list.appendChild(frag);
 }
+$('list').addEventListener('click',e=>{ const row=e.target.closest('.row'); if(row) openCard(row.dataset.id); });
 
 // ---------- карточка ----------
+let cardId=null;
 async function openCard(id){
-  const p=places.get(id); if(!p) return;
+  const p=places.get(id); if(!p) return; cardId=id;
   $('card').classList.add('open'); $('card').scrollTop=0;
+  if(tg) try{ tg.BackButton.show(); }catch(e){}
   $('c-title').textContent=p.name;
   $('c-cat').textContent=[p.rubrics.join(', ')||p.cat.name, p.addr].filter(Boolean).join(' · ');
   const open=isOpenNow(p);
@@ -458,11 +496,12 @@ async function openCard(id){
   const tel=p.phone?'tel:'+p.phone.replace(/[^\d+]/g,''):'';
   const route=`https://yandex.ru/maps/?rtext=${me?me[0]+','+me[1]:''}~${p.lat},${p.lon}&rtt=pd`;
   const gisUrl=p.gisId?`https://2gis.ru/firm/${p.gisId}`:`https://2gis.ru/search/${encodeURIComponent(p.name)}?m=${p.lon},${p.lat}/17`;
+  const ya=`https://yandex.ru/maps/?text=${encodeURIComponent(p.name)}&ll=${p.lon},${p.lat}&z=17`;
   $('c-actions').innerHTML=`
     <a class="primary ${tel?'':'off'}" href="${tel}"><span>📞</span>${tel?'Позвонить':'Нет номера'}</a>
-    <a href="${route}" target="_blank" rel="noopener"><span>🧭</span>Маршрут</a>
-    <a class="${p.site?'':'off'}" href="${esc(p.site)}" target="_blank" rel="noopener"><span>🌐</span>Сайт</a>
-    <a href="${gisUrl}" target="_blank" rel="noopener"><span>🪑</span>Бронь</a>`;
+    <a data-ext="${esc(route)}"><span>🧭</span>Маршрут</a>
+    <a class="${p.site?'':'off'}" data-ext="${esc(p.site)}"><span>🌐</span>Сайт</a>
+    <a data-ext="${esc(gisUrl)}"><span>🪑</span>Бронь</a>`;
   const hrs=hoursText(p);
   $('c-kv').innerHTML=`
     ${hrs?`<dt>Часы</dt><dd>${esc(hrs)}</dd>`:''}
@@ -471,12 +510,10 @@ async function openCard(id){
     ${p.extras.length?`<dt>Удобства</dt><dd>${esc(p.extras.join(', '))}</dd>`:''}
     <dt>Источник</dt><dd>${p.source}${p.osmId?' + OpenStreetMap':''}</dd>`;
   $('c-menu').innerHTML=p.menu.length?`<div class="sect">В меню</div><div class="tags">${p.menu.map(m=>'<span>'+esc(m)+'</span>').join('')}</div>`:'';
-  const q=encodeURIComponent(p.name);
   $('c-links').innerHTML=`
-    <a href="${gisUrl}" target="_blank" rel="noopener">Отзывы на 2ГИС →</a>
-    <a href="https://yandex.ru/maps/?text=${q}&ll=${p.lon},${p.lat}&z=17" target="_blank" rel="noopener">Отзывы на Яндекс Картах →</a>
-    ${p.osmId?`<a href="https://www.openstreetmap.org/${p.osmId}" target="_blank" rel="noopener">OpenStreetMap</a>`:''}`;
-  // фото
+    <a data-ext="${esc(gisUrl)}">Отзывы на 2ГИС →</a>
+    <a data-ext="${esc(ya)}">Отзывы на Яндекс Картах →</a>
+    ${p.osmId?`<a data-ext="https://www.openstreetmap.org/${p.osmId}">OpenStreetMap</a>`:''}`;
   const ph=$('c-photos'); ph.innerHTML=''; $('c-photos-note').textContent='';
   const imgs=[...p.photos];
   if(!imgs.length){
@@ -487,24 +524,28 @@ async function openCard(id){
       Object.values(j.query?.pages||{}).forEach(pg=>{ const u=pg.imageinfo?.[0]?.thumburl; if(u&&/\.(jpe?g|png|webp)(\?|$)/i.test(u)) imgs.push(u); });
       if(imgs.length) $('c-photos-note').textContent='Фото из Wikimedia Commons, снятые в радиусе 60 м: может быть здание, а не интерьер.';
     }catch(e){}
-    if($('c-title').textContent!==p.name) return;
+    if(cardId!==id) return;
   }
   if(imgs.length) ph.innerHTML=imgs.map(u=>`<img src="${u}" alt="" loading="lazy">`).join('');
   else ph.innerHTML='<div class="nophoto">Фото пока нет: 2ГИС по демо-ключу фото не отдаёт, в открытых источниках снимков этого места нет.</div>';
 }
-$('close').onclick=()=>$('card').classList.remove('open');
+function closeCard(){ $('card').classList.remove('open'); cardId=null; if(tg) try{ tg.BackButton.hide(); }catch(e){} }
+$('close').onclick=closeCard;
+$('card').addEventListener('click',e=>{ const a=e.target.closest('a[data-ext]'); if(a&&a.dataset.ext){ e.preventDefault(); openExternal(a.dataset.ext); } });
 $('handle').onclick=()=>$('sheet').classList.toggle('collapsed');
 
 // ---------- настройки ----------
 $('settings').onclick=()=>{ $('key2gis').value=settings.key; $('threshold').value=String(settings.threshold); $('minrev').value=String(settings.minrev); $('shownorate').checked=settings.shownorate; $('reqcount').textContent=ls.get('reqcount',0)||0; $('modal').classList.add('open'); };
 $('m-cancel').onclick=()=>$('modal').classList.remove('open');
-$('m-clear').onclick=()=>{ try{ Object.keys(localStorage).filter(k=>k.startsWith('q:')).forEach(k=>localStorage.removeItem(k)); }catch(e){} places.clear(); $('modal').classList.remove('open'); loadHere(); };
-$('m-save').onclick=()=>{ const hadKey=!!settings.key; ls.set('k2gis',$('key2gis').value.trim()); ls.set('thr',parseFloat($('threshold').value)); ls.set('minrev',parseInt($('minrev').value,10)); ls.set('shownorate',$('shownorate').checked); $('modal').classList.remove('open'); if(!hadKey || !places.size) loadHere(); else renderList(); };
+$('m-clear').onclick=()=>{ ls.del('places'); ls.del('circles'); places.clear(); circles=[]; $('modal').classList.remove('open'); renderList(); loadHere(); };
+$('m-save').onclick=()=>{ const hadKey=!!settings.key; ls.set('k2gis',$('key2gis').value.trim()); ls.set('thr',parseFloat($('threshold').value)); ls.set('minrev',parseInt($('minrev').value,10)); ls.set('shownorate',$('shownorate').checked); $('modal').classList.remove('open'); renderList(); if(!hadKey) loadHere(); };
 
-map.on('resize',()=>renderList());
-
-// ---------- старт ----------
-map.whenReady(()=>requestAnimationFrame(()=>locate(true)));
+// ---------- старт: показать кеш сразу, геолокацию и загрузку запускать параллельно ----------
+map.whenReady(()=>{
+  const lm=ls.get('me',null); if(lm && Date.now()-lm.t<DAY_MS*7) setMe(lm.lat,lm.lon,null,!lastView);
+  renderList();
+  requestAnimationFrame(()=>{ loadHere(); locate(true); });
+});
 </script>
 </body>
 </html>
