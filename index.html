@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Карта заведений 4+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#F4F6F8; --paper:#fff; --ink:#1A222C; --ink-2:#4A5563; --ink-3:#7C8794; --line:#D9DFE6;
+  --accent:#A8213D; --accent-soft:#F7E6EA; --ok:#1E7A4B; --ok-soft:#E3F2E9; --warn:#9A6400; --warn-soft:#FBF0D6;
+  --r-hi:#A8213D; --r-mid:#2E3E52; --r-lo:#8A96A3; --r-none:#5B6774;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);overflow:hidden}
+#map{position:absolute;inset:0}
+.leaflet-container{font:inherit}
+.leaflet-control-attribution{font-size:10px}
+
+/* верхняя панель */
+.top{position:absolute;top:0;left:0;right:0;z-index:1000;padding:10px 10px 0;pointer-events:none}
+.top>*{pointer-events:auto}
+.bar{display:flex;gap:8px;align-items:center;background:var(--paper);border-radius:12px;box-shadow:0 2px 10px rgba(20,30,40,.15);padding:8px 10px}
+.bar .logo{font-weight:700;font-size:15px;white-space:nowrap;padding:0 4px}
+.bar .logo b{color:var(--accent)}
+.bar input{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;min-width:0}
+.bar button{border:0;background:var(--accent);color:#fff;font:inherit;font-weight:600;font-size:14px;padding:8px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.bar button.ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;background:var(--paper);border:1px solid var(--line);border-radius:99px;padding:6px 12px;font-size:13px;font-weight:500;cursor:pointer;box-shadow:0 1px 4px rgba(20,30,40,.1);user-select:none}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chip.acc.on{background:var(--accent);border-color:var(--accent)}
+.status{display:inline-block;margin-top:6px;background:rgba(26,34,44,.85);color:#fff;font-size:12px;padding:5px 10px;border-radius:8px}
+.status.hidden{display:none}
+
+/* кнопка геолокации */
+.locate{position:absolute;right:10px;bottom:calc(var(--sheet,120px) + 14px);z-index:1000;width:44px;height:44px;border-radius:50%;border:0;background:var(--paper);box-shadow:0 2px 10px rgba(20,30,40,.2);cursor:pointer;font-size:20px;display:grid;place-items:center;transition:bottom .2s}
+
+/* нижняя шторка со списком */
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:1001;background:var(--paper);border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(20,30,40,.18);max-height:70vh;display:flex;flex-direction:column;transition:transform .25s}
+.sheet.collapsed{transform:translateY(calc(100% - 52px))}
+.sheet .handle{padding:8px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;border-bottom:1px solid var(--line);font-size:14px;font-weight:600;flex:none}
+.sheet .handle::before{content:"";position:absolute;left:50%;top:6px;width:36px;height:4px;margin-left:-18px;border-radius:2px;background:var(--line)}
+.sheet .handle span.cnt{color:var(--ink-3);font-weight:500}
+.list{overflow-y:auto;padding:4px 0 env(safe-area-inset-bottom)}
+.row{display:grid;grid-template-columns:48px 1fr auto;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);cursor:pointer;align-items:center}
+.row:hover{background:var(--bg)}
+.row .thumb{width:48px;height:48px;border-radius:8px;background:var(--bg);object-fit:cover;display:grid;place-items:center;font-size:22px;overflow:hidden}
+.row .thumb img{width:100%;height:100%;object-fit:cover}
+.row .t{font-weight:600;font-size:15px;line-height:1.25}
+.row .s{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.row .r{text-align:right;font-variant-numeric:tabular-nums}
+.rate{display:inline-block;font-weight:700;font-size:14px;padding:2px 8px;border-radius:6px;color:#fff;background:var(--r-none)}
+.rate.hi{background:var(--r-hi)} .rate.mid{background:var(--r-mid)} .rate.lo{background:var(--r-lo)}
+.rate.none{background:var(--bg);color:var(--ink-3);font-weight:500;font-size:12px}
+.dist{font-size:12px;color:var(--ink-3);margin-top:4px}
+.empty{padding:28px 16px;color:var(--ink-2);font-size:14px;text-align:center;line-height:1.5}
+
+/* карточка заведения */
+.card{position:absolute;inset:0;z-index:1002;background:var(--paper);overflow-y:auto;display:none}
+.card.open{display:block}
+.card .back{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--paper);border-bottom:1px solid var(--line)}
+.card .back button{border:0;background:var(--bg);width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer}
+.card .back .h{font-weight:700;font-size:16px;line-height:1.2;text-wrap:balance}
+.photos{display:flex;gap:6px;overflow-x:auto;padding:12px 12px 0;scroll-snap-type:x mandatory}
+.photos img{height:200px;min-width:260px;max-width:85vw;border-radius:10px;object-fit:cover;scroll-snap-align:start;background:var(--bg)}
+.photos .nophoto{height:140px;flex:1;border-radius:10px;background:var(--bg);display:grid;place-items:center;color:var(--ink-3);font-size:13px;text-align:center;padding:16px;line-height:1.4}
+.photos-note{font-size:11.5px;color:var(--ink-3);padding:6px 14px 0}
+.body{padding:14px 14px 40px;max-width:720px}
+.body .cat{font-size:13px;color:var(--ink-2)}
+.ratings{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.rbox{border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:110px}
+.rbox .k{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
+.rbox .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.rbox .v small{font-size:12px;font-weight:500;color:var(--ink-3)}
+.actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
+.actions a{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:10px;background:var(--bg);color:var(--ink);text-decoration:none;font-size:12px;font-weight:600}
+.actions a.primary{background:var(--accent);color:#fff}
+.actions a.off{opacity:.4;pointer-events:none}
+.actions a span{font-size:20px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:14px;margin:14px 0;line-height:1.45}
+.kv dt{color:var(--ink-3)}
+.kv dd{margin:0;word-break:break-word}
+.kv a{color:var(--accent)}
+.links{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.links a{font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.links a:hover{border-color:var(--ink)}
+.sect{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600;margin:20px 0 8px}
+.note{font-size:13px;color:var(--ink-2);background:var(--warn-soft);border-radius:8px;padding:10px 12px;line-height:1.45}
+
+/* настройки */
+.modal{position:absolute;inset:0;z-index:1003;background:rgba(20,30,40,.5);display:none;align-items:center;justify-content:center;padding:16px}
+.modal.open{display:flex}
+.modal .box{background:var(--paper);border-radius:14px;padding:18px;max-width:440px;width:100%;font-size:14px;line-height:1.5}
+.modal h3{margin:0 0 8px;font-size:17px}
+.modal input,.modal select{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;margin:6px 0 10px}
+.modal .row2{display:flex;gap:8px;justify-content:flex-end}
+.modal button{border:0;border-radius:8px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer;background:var(--bg)}
+.modal button.primary{background:var(--accent);color:#fff}
+.modal p{margin:6px 0;color:var(--ink-2)}
+.modal .hint{font-size:12.5px;color:var(--ink-3)}
+
+/* маркеры */
+.pin{width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);background:var(--r-none)}
+.pin.hi{background:var(--r-hi);width:18px;height:18px}.pin.mid{background:var(--r-mid)}.pin.lo{background:var(--r-lo)}
+.pin.me{background:#1E7A4B;box-shadow:0 0 0 6px rgba(30,122,75,.25)}
+.leaflet-tooltip.lbl{font:600 12px "Golos Text",sans-serif;padding:2px 6px;border-radius:6px}
+
+@media (min-width:900px){
+  .sheet{left:12px;right:auto;width:400px;bottom:12px;border-radius:16px;max-height:calc(100vh - 150px)}
+  .sheet.collapsed{transform:none}
+  .top{right:auto;width:600px}
+  .card{left:12px;right:auto;width:400px;top:12px;bottom:12px;border-radius:16px;box-shadow:0 4px 24px rgba(20,30,40,.25)}
+  .locate{bottom:30px}
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="top">
+  <div class="bar">
+    <div class="logo">Карта <b>4+</b></div>
+    <input id="q" placeholder="Город или адрес" autocomplete="off">
+    <button id="go">Найти</button>
+    <button id="settings" class="ghost" title="Настройки">⚙</button>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="status" id="status">Определяю местоположение…</div>
+</div>
+
+<button class="locate" id="locate" title="Где я">◎</button>
+
+<div class="sheet collapsed" id="sheet">
+  <div class="handle" id="handle"><span>Заведения рядом</span><span class="cnt" id="cnt">—</span></div>
+  <div class="list" id="list"><div class="empty">Ищу заведения…</div></div>
+</div>
+
+<div class="card" id="card">
+  <div class="back"><button id="close">←</button><div class="h" id="c-title"></div></div>
+  <div class="photos" id="c-photos"></div>
+  <div class="photos-note" id="c-photos-note"></div>
+  <div class="body">
+    <div class="cat" id="c-cat"></div>
+    <div class="ratings" id="c-ratings"></div>
+    <div class="actions" id="c-actions"></div>
+    <dl class="kv" id="c-kv"></dl>
+    <div class="sect">Отзывы</div>
+    <div class="links" id="c-links"></div>
+    <div class="sect">Карточка на других картах</div>
+    <div class="links" id="c-ext"></div>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="box">
+    <h3>Настройки</h3>
+    <p>Ключ 2ГИС Places API. Без него заведения приходят из OpenStreetMap без рейтингов, и фильтр «не ниже 4» отключён. Демо-ключ выдаётся на dev.2gis.ru после регистрации.</p>
+    <input id="key2gis" placeholder="Ключ 2ГИС (необязательно)">
+    <p>Порог рейтинга</p>
+    <select id="threshold">
+      <option value="0">Показывать все, рейтинг не учитывать</option>
+      <option value="4" selected>Не ниже 4,0</option>
+      <option value="4.3">Не ниже 4,3</option>
+      <option value="4.5">Не ниже 4,5</option>
+    </select>
+    <p class="hint">Порог действует только у заведений с известным рейтингом. Заведения без рейтинга показываются серыми, пока не подключён 2ГИС.</p>
+    <div class="row2"><button id="m-cancel">Отмена</button><button id="m-save" class="primary">Сохранить</button></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ---------- настройки и состояние ----------
+const CATS = [
+  {id:'restaurant', name:'Рестораны', icon:'🍽️', osm:{amenity:['restaurant']}},
+  {id:'cafe',       name:'Кафе',      icon:'☕',  osm:{amenity:['cafe']}},
+  {id:'bar',        name:'Бары',      icon:'🍺',  osm:{amenity:['bar','pub','biergarten']}},
+  {id:'fast',       name:'Стритфуд',  icon:'🌯',  osm:{amenity:['fast_food','food_court']}},
+  {id:'bakery',     name:'Пекарни',   icon:'🥐',  osm:{shop:['bakery','pastry','confectionery']}},
+  {id:'deli',       name:'Готовая еда', icon:'🥡', osm:{shop:['deli','frozen_food'], amenity:['ice_cream']}},
+];
+const store = {
+  get k2gis(){ try{return localStorage.getItem('k2gis')||''}catch(e){return ''} },
+  set k2gis(v){ try{localStorage.setItem('k2gis',v)}catch(e){} },
+  get threshold(){ try{return parseFloat(localStorage.getItem('thr')||'4')}catch(e){return 4} },
+  set threshold(v){ try{localStorage.setItem('thr',String(v))}catch(e){} },
+};
+let active = new Set(CATS.map(c=>c.id));
+let openNow = false;
+let places = [];          // текущие заведения в области
+let me = null;            // [lat, lon]
+let markers = L.layerGroup();
+let meMarker = null;
+let loadSeq = 0;
+
+// ---------- карта ----------
+const map = L.map('map', {zoomControl:false, attributionControl:true}).setView([56.36, 41.31], 14);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19, attribution: '© участники <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+}).addTo(map);
+L.control.zoom({position:'topright'}).addTo(map);
+markers.addTo(map);
+
+const $ = id => document.getElementById(id);
+const status = (t) => { const s=$('status'); if(!t){s.classList.add('hidden');return} s.textContent=t; s.classList.remove('hidden'); };
+
+// ---------- чипы ----------
+function renderChips(){
+  const box = $('chips'); box.innerHTML='';
+  const all = document.createElement('div'); all.className='chip acc'+(openNow?' on':''); all.textContent='Открыто сейчас';
+  all.onclick=()=>{openNow=!openNow; renderChips(); renderList();}; box.appendChild(all);
+  CATS.forEach(c=>{
+    const d=document.createElement('div'); d.className='chip'+(active.has(c.id)?' on':''); d.textContent=c.icon+' '+c.name;
+    d.onclick=()=>{ if(active.has(c.id)) active.delete(c.id); else active.add(c.id); renderChips(); renderList(); };
+    box.appendChild(d);
+  });
+}
+renderChips();
+
+// ---------- геолокация ----------
+function locate(first){
+  if(!navigator.geolocation){ status('Геолокация недоступна в этом браузере'); loadHere(); return; }
+  status('Определяю местоположение…');
+  navigator.geolocation.getCurrentPosition(p=>{
+    me=[p.coords.latitude, p.coords.longitude];
+    if(meMarker) meMarker.setLatLng(me); else meMarker=L.marker(me,{icon:L.divIcon({className:'',html:'<div class="pin me"></div>',iconSize:[14,14]})}).addTo(map);
+    map.setView(me, first?15:map.getZoom());
+    status('Точность '+Math.round(p.coords.accuracy)+' м');
+    setTimeout(()=>status(''),2500);
+    loadHere();
+  }, err=>{
+    status('Доступ к геолокации не дан, показываю центр карты');
+    setTimeout(()=>status(''),3000);
+    loadHere();
+  }, {enableHighAccuracy:true, timeout:8000, maximumAge:30000});
+}
+$('locate').onclick=()=>locate(false);
+
+// ---------- поиск города/адреса (Nominatim, бесплатно) ----------
+async function geocode(q){
+  status('Ищу «'+q+'»…');
+  try{
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=ru&countrycodes=ru&q='+encodeURIComponent(q));
+    const j = await r.json();
+    if(!j.length){ status('Ничего не найдено'); setTimeout(()=>status(''),2500); return; }
+    map.setView([+j[0].lat, +j[0].lon], j[0].type==='city'||j[0].class==='place'?13:16);
+    status(''); loadHere();
+  }catch(e){ status('Поиск адреса недоступен: '+e.message); }
+}
+$('go').onclick=()=>{ const q=$('q').value.trim(); if(q) geocode(q); };
+$('q').addEventListener('keydown',e=>{ if(e.key==='Enter') $('go').onclick(); });
+
+// ---------- Overpass: заведения из OSM ----------
+const OVERPASS = [
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+];
+function overpassQuery(b){
+  const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map(v=>v.toFixed(5)).join(',');
+  const am = new Set(), sh = new Set();
+  CATS.forEach(c=>{ (c.osm.amenity||[]).forEach(v=>am.add(v)); (c.osm.shop||[]).forEach(v=>sh.add(v)); });
+  return `[out:json][timeout:25];(
+    nwr["amenity"~"^(${[...am].join('|')})$"](${bbox});
+    nwr["shop"~"^(${[...sh].join('|')})$"](${bbox});
+  );out center tags;`;
+}
+async function fetchOverpass(q){
+  let lastErr;
+  for(const url of OVERPASS){
+    try{
+      const r = await fetch(url, {method:'POST', body:'data='+encodeURIComponent(q), headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return await r.json();
+    }catch(e){ lastErr=e; }
+  }
+  throw lastErr||new Error('Overpass недоступен');
+}
+function catOf(tags){
+  for(const c of CATS){
+    if(c.osm.amenity && c.osm.amenity.includes(tags.amenity)) return c;
+    if(c.osm.shop && c.osm.shop.includes(tags.shop)) return c;
+  }
+  return null;
+}
+function osmToPlace(el){
+  const t = el.tags||{}; const cat = catOf(t); if(!cat) return null;
+  const lat = el.lat ?? el.center?.lat, lon = el.lon ?? el.center?.lon; if(lat==null) return null;
+  const name = t['name:ru']||t.name||t.brand||'';
+  if(!name) return null;
+  const addr = [t['addr:street'], t['addr:housenumber']].filter(Boolean).join(', ');
+  const image = t.image && /^https?:\/\//.test(t.image) ? t.image : (t.wikimedia_commons && /^File:/i.test(t.wikimedia_commons) ? 'https://commons.wikimedia.org/wiki/Special:FilePath/'+encodeURIComponent(t.wikimedia_commons.replace(/^File:/i,''))+'?width=800' : null);
+  return {
+    id:'osm/'+el.type+'/'+el.id, name, cat, lat, lon, addr,
+    cuisine: t.cuisine ? t.cuisine.split(';').map(s=>s.trim()).join(', ') : '',
+    hours: t.opening_hours||'', phone: t.phone||t['contact:phone']||'', site: t.website||t['contact:website']||'',
+    photos: image?[image]:[], rating:null, reviews:0, avgCheck:null, source:'OSM', tags:t
+  };
+}
+
+// ---------- 2ГИС Places API (рейтинги), если введён ключ ----------
+async function enrich2gis(b){
+  const key = store.k2gis; if(!key) return;
+  const c = b.getCenter();
+  const radius = Math.min(50000, Math.round(map.distance(b.getNorthWest(), b.getSouthEast())/2));
+  const fieldsets = ['items.point,items.reviews,items.schedule,items.attribute_groups,items.rubrics,items.contact_groups', 'items.point,items.reviews,items.schedule,items.attribute_groups,items.rubrics'];
+  status('Запрашиваю рейтинги 2ГИС…');
+  const queries = ['ресторан','кафе','бар','быстрое питание','пекарня','кулинария'];
+  const got = [];
+  for(const q of queries){
+    for(const fields of fieldsets){
+      try{
+        const u = `https://catalog.api.2gis.com/3.0/items?q=${encodeURIComponent(q)}&point=${c.lng},${c.lat}&radius=${radius}&sort=distance&page_size=50&fields=${fields}&key=${encodeURIComponent(key)}`;
+        const r = await fetch(u); const j = await r.json();
+        if(j.meta && j.meta.code!==200) throw new Error(j.meta.error?.message||('код '+j.meta.code));
+        (j.result?.items||[]).forEach(it=>got.push(it)); break;
+      }catch(e){ if(fields===fieldsets[1]){ status('2ГИС: '+e.message); return; } }
+    }
+  }
+  // сопоставление с OSM по расстоянию и названию, остальные добавляем как новые точки
+  const norm = s => (s||'').toLowerCase().replace(/[«»"'`ё]/g,m=>m==='ё'?'е':'').replace(/[^a-zа-я0-9]+/g,' ').trim();
+  got.forEach(it=>{
+    if(!it.point) return;
+    const r = it.reviews||{}; const rating = r.general_rating ?? r.rating ?? r.org_rating ?? null; const cnt = r.general_review_count ?? r.review_count ?? 0;
+    let avg=null; (it.attribute_groups||[]).forEach(g=>(g.attributes||[]).forEach(a=>{ const m=/средн\w* чек[^0-9]*([0-9][0-9 ]*)/i.exec(a.name||''); if(m) avg=parseInt(m[1].replace(/\s/g,''),10); }));
+    const nm = norm(it.name);
+    let best=null, bd=80;
+    places.forEach(p=>{ const d=map.distance([p.lat,p.lon],[it.point.lat,it.point.lon]); if(d<bd && (norm(p.name)===nm || norm(p.name).includes(nm) || nm.includes(norm(p.name)))){best=p;bd=d;} });
+    const phone = (it.contact_groups||[]).flatMap(g=>g.contacts||[]).find(c=>c.type==='phone')?.value||'';
+    if(best){ best.rating=rating; best.reviews=cnt; best.avgCheck=avg; best.gisId=it.id; if(!best.phone&&phone) best.phone=phone; best.source='OSM + 2ГИС'; }
+    else {
+      const cat = CATS.find(c=>c.id==='restaurant') ;
+      places.push({id:'2gis/'+it.id, gisId:it.id, name:it.name, cat, lat:it.point.lat, lon:it.point.lon, addr:it.address_name||'', cuisine:'', hours:'', phone, site:'', photos:[], rating, reviews:cnt, avgCheck:avg, source:'2ГИС', tags:{}});
+    }
+  });
+  status('');
+}
+
+// ---------- загрузка по текущей области ----------
+let loadTimer=null;
+map.on('moveend', ()=>{ clearTimeout(loadTimer); loadTimer=setTimeout(loadHere, 600); });
+async function loadHere(){
+  if(map.getZoom()<12){ $('list').innerHTML='<div class="empty">Приблизьте карту, чтобы увидеть заведения</div>'; $('cnt').textContent='—'; markers.clearLayers(); return; }
+  const seq=++loadSeq; const b=map.getBounds();
+  status('Ищу заведения…');
+  try{
+    const j = await fetchOverpass(overpassQuery(b));
+    if(seq!==loadSeq) return;
+    places = (j.elements||[]).map(osmToPlace).filter(Boolean);
+    status('');
+    await enrich2gis(b);
+    if(seq!==loadSeq) return;
+    renderList();
+  }catch(e){
+    if(seq!==loadSeq) return;
+    status('Не удалось загрузить заведения: '+e.message);
+    $('list').innerHTML='<div class="empty">Серверы OpenStreetMap не ответили. Попробуйте ещё раз через минуту.</div>';
+  }
+}
+
+// ---------- часы работы: грубая проверка «открыто сейчас» ----------
+const DAYS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+function isOpenNow(h){
+  if(!h) return null;
+  if(/24\/7/.test(h)) return true;
+  const now=new Date(); const d=DAYS[now.getDay()]; const cur=now.getHours()*60+now.getMinutes();
+  let res=null;
+  h.split(';').forEach(rule=>{
+    rule=rule.trim(); if(!rule) return;
+    const m=/^([A-Za-z,\-\s]*)\s*([0-9:,\s\-+]+)$/.exec(rule); if(!m) return;
+    const days=m[1].trim(); let applies=false;
+    if(!days) applies=true;
+    else days.split(',').forEach(part=>{ part=part.trim(); const r=/^([A-Z][a-z])-([A-Z][a-z])$/.exec(part);
+      if(r){ const a=DAYS.indexOf(r[1]), b=DAYS.indexOf(r[2]), i=DAYS.indexOf(d); if(a<=b? (i>=a&&i<=b) : (i>=a||i<=b)) applies=true; }
+      else if(part===d) applies=true; });
+    if(!applies) return;
+    if(/off|closed/i.test(m[2])){ res=false; return; }
+    let open=false;
+    m[2].split(',').forEach(span=>{ const s=/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/.exec(span); if(!s) return;
+      let a=+s[1]*60+ +s[2], b=+s[3]*60+ +s[4]; if(b<=a) b+=1440; if(cur>=a&&cur<b) open=true; if(cur+1440>=a&&cur+1440<b) open=true; });
+    res=open;
+  });
+  return res;
+}
+
+// ---------- список и маркеры ----------
+function rateClass(r){ if(r==null) return 'none'; if(r>=4.8) return 'hi'; if(r>=4.5) return 'mid'; return 'lo'; }
+function fmtDist(m){ return m<1000? Math.round(m)+' м' : (m/1000).toFixed(1)+' км'; }
+function visiblePlaces(){
+  const thr=store.threshold;
+  return places.filter(p=>active.has(p.cat.id))
+    .filter(p=>p.rating==null || p.rating>=thr)
+    .filter(p=>!openNow || isOpenNow(p.hours)===true)
+    .map(p=>({...p, dist: me? map.distance(me,[p.lat,p.lon]) : map.distance(map.getCenter(),[p.lat,p.lon])}))
+    .sort((a,b)=>(b.rating??-1)-(a.rating??-1) || a.dist-b.dist);
+}
+function renderList(){
+  const v=visiblePlaces(); const list=$('list'); list.innerHTML=''; markers.clearLayers();
+  $('cnt').textContent=v.length+' из '+places.length;
+  if(!v.length){ list.innerHTML='<div class="empty">'+(places.length?'Под фильтры ничего не попало':'В этой области заведений в OpenStreetMap нет')+'</div>'; return; }
+  v.forEach(p=>{
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML=`<div class="thumb">${p.photos[0]?`<img src="${p.photos[0]}" alt="" loading="lazy">`:p.cat.icon}</div>
+      <div><div class="t">${esc(p.name)}</div><div class="s">${p.cat.name}${p.cuisine?' · '+esc(p.cuisine):''}${p.addr?' · '+esc(p.addr):''}</div></div>
+      <div class="r"><span class="rate ${rateClass(p.rating)}">${p.rating!=null?p.rating.toFixed(1):'нет рейтинга'}</span><div class="dist">${fmtDist(p.dist)}</div></div>`;
+    row.onclick=()=>openCard(p);
+    list.appendChild(row);
+    const mk=L.marker([p.lat,p.lon],{icon:L.divIcon({className:'',html:`<div class="pin ${rateClass(p.rating)}"></div>`,iconSize:[14,14],iconAnchor:[7,7]})});
+    mk.bindTooltip(p.name+(p.rating!=null?' · '+p.rating.toFixed(1):''),{className:'lbl',direction:'top',offset:[0,-6]});
+    mk.on('click',()=>openCard(p));
+    markers.addLayer(mk);
+  });
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ---------- карточка ----------
+async function openCard(p){
+  $('card').classList.add('open');
+  $('c-title').textContent=p.name;
+  $('c-cat').textContent=[p.cat.name, p.cuisine, p.addr].filter(Boolean).join(' · ');
+  const open=isOpenNow(p.hours);
+  $('c-ratings').innerHTML=`
+    <div class="rbox"><div class="k">2ГИС</div><div class="v">${p.rating!=null?p.rating.toFixed(1)+' <small>'+p.reviews+' отз.</small>':'<small>нет данных</small>'}</div></div>
+    <div class="rbox"><div class="k">Средний чек</div><div class="v">${p.avgCheck?p.avgCheck+' ₽':'<small>нет данных</small>'}</div></div>
+    <div class="rbox"><div class="k">Сейчас</div><div class="v" style="color:${open===true?'var(--ok)':open===false?'var(--accent)':'var(--ink-3)'};font-size:16px">${open===true?'Открыто':open===false?'Закрыто':'Часы неизвестны'}</div></div>`;
+  const tel=p.phone?'tel:'+p.phone.replace(/[^\d+]/g,''):'';
+  const route=`https://yandex.ru/maps/?rtext=${me?me[0]+','+me[1]:''}~${p.lat},${p.lon}&rtt=pd`;
+  $('c-actions').innerHTML=`
+    <a class="primary ${tel?'':'off'}" href="${tel}"><span>📞</span>${tel?'Позвонить':'Нет номера'}</a>
+    <a href="${route}" target="_blank" rel="noopener"><span>🧭</span>Маршрут</a>
+    <a class="${p.site?'':'off'}" href="${esc(p.site)}" target="_blank" rel="noopener"><span>🌐</span>Сайт</a>
+    <a class="${tel?'':'off'}" href="${tel}"><span>🪑</span>Бронь</a>`;
+  $('c-kv').innerHTML=`
+    ${p.hours?`<dt>Часы</dt><dd>${esc(p.hours)}</dd>`:''}
+    ${p.phone?`<dt>Телефон</dt><dd><a href="${tel}">${esc(p.phone)}</a></dd>`:''}
+    ${p.addr?`<dt>Адрес</dt><dd>${esc(p.addr)}</dd>`:''}
+    <dt>Источник</dt><dd>${p.source}</dd>`;
+  const q=encodeURIComponent(p.name);
+  $('c-links').innerHTML=`
+    <a href="https://2gis.ru/search/${q}?m=${p.lon},${p.lat}/17" target="_blank" rel="noopener">Отзывы на 2ГИС →</a>
+    <a href="https://yandex.ru/maps/?text=${q}&ll=${p.lon},${p.lat}&z=17" target="_blank" rel="noopener">Отзывы на Яндекс Картах →</a>`;
+  $('c-ext').innerHTML=`
+    <a href="https://www.openstreetmap.org/${p.id.startsWith('osm/')?p.id.slice(4):''}" target="_blank" rel="noopener">OpenStreetMap</a>
+    <a href="https://zoon.ru/search/?query=${q}" target="_blank" rel="noopener">Zoon</a>`;
+  // фото
+  const ph=$('c-photos'); ph.innerHTML=''; $('c-photos-note').textContent='';
+  const imgs=[...p.photos];
+  if(!imgs.length){
+    ph.innerHTML='<div class="nophoto">Ищу фото рядом…</div>';
+    try{
+      const r=await fetch(`https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=geosearch&ggscoord=${p.lat}|${p.lon}&ggsradius=60&ggslimit=6&ggsnamespace=6&prop=imageinfo&iiprop=url&iiurlwidth=800`);
+      const j=await r.json();
+      Object.values(j.query?.pages||{}).forEach(pg=>{ const u=pg.imageinfo?.[0]?.thumburl; if(u&&/\.(jpe?g|png|webp)(\?|$)/i.test(u)) imgs.push(u); });
+      if(imgs.length) $('c-photos-note').textContent='Фото места из Wikimedia Commons: снято в радиусе 60 м, может быть здание, а не интерьер.';
+    }catch(e){}
+  }
+  if(imgs.length){ ph.innerHTML=imgs.map(u=>`<img src="${u}" alt="" loading="lazy">`).join(''); }
+  else ph.innerHTML='<div class="nophoto">Фото пока нет. Открытые источники (OSM, Wikimedia) фото этого заведения не содержат.<br>Фото появятся от владельца или из платного API.</div>';
+}
+$('close').onclick=()=>$('card').classList.remove('open');
+
+// ---------- шторка ----------
+$('handle').onclick=()=>$('sheet').classList.toggle('collapsed');
+
+// ---------- настройки ----------
+$('settings').onclick=()=>{ $('key2gis').value=store.k2gis; $('threshold').value=String(store.threshold); $('modal').classList.add('open'); };
+$('m-cancel').onclick=()=>$('modal').classList.remove('open');
+$('m-save').onclick=()=>{ store.k2gis=$('key2gis').value.trim(); store.threshold=parseFloat($('threshold').value); $('modal').classList.remove('open'); loadHere(); };
+
+// ---------- старт ----------
+locate(true);
+</script>
+</body>
+</html>
