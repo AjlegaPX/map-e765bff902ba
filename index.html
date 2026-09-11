@@ -71,6 +71,10 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
 .photos img{height:200px;min-width:260px;max-width:85vw;border-radius:10px;object-fit:cover;scroll-snap-align:start;background:var(--bg)}
 .photos .nophoto{height:120px;flex:1;border-radius:10px;background:var(--bg);display:grid;place-items:center;color:var(--ink-3);font-size:13px;text-align:center;padding:16px;line-height:1.4}
 .photos-note{font-size:11.5px;color:var(--ink-3);padding:6px 14px 0}
+.photo-ya{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:9px 14px;border-radius:8px;background:var(--accent);color:#fff;font-size:13px;font-weight:600;text-decoration:none;cursor:pointer}
+.photo-ya span{font-size:16px}
+.photo-more{min-width:160px;height:200px;border-radius:10px;background:var(--bg);display:grid;place-items:center;scroll-snap-align:start;padding:10px;text-align:center}
+.photo-more .photo-ya{margin-top:0}
 .body{padding:14px 14px 40px;max-width:720px}
 .body .cat{font-size:13px;color:var(--ink-2)}
 .ratings{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
@@ -545,22 +549,35 @@ async function openCard(id){
   renderCardContacts(p, !p.phone && !!settings.ykey && !p.yaChecked);
   $('c-menu').innerHTML=p.menu.length?`<div class="sect">В меню</div><div class="tags">${p.menu.map(m=>'<span>'+esc(m)+'</span>').join('')}</div>`:'';
   if(!p.phone && settings.ykey && !p.yaChecked){
-    yandexLookup(p).catch(e=>{ status('Яндекс: '+(e.message||'ошибка'), 3000); }).then(()=>{ if(cardId===id) renderCardContacts(p,false); });
+    yandexLookup(p).catch(e=>{ status('Яндекс: '+(e.message||'ошибка'), 3000); }).then(()=>{ if(cardId===id){ renderCardContacts(p,false); renderPhotos(p); } });
   }
-  const ph=$('c-photos'); ph.innerHTML=''; $('c-photos-note').textContent='';
+  renderPhotos(p);
+}
+// Фото: ни 2ГИС, ни Яндекс через API снимки не отдают, а страницы Яндекс Карт запрещают встраивание.
+// Поэтому из блока фото ведёт кнопка в галерею Яндекс Карт; снимки из OSM и Wikimedia показываются, если есть.
+function yaGalleryUrl(p){ return p.yaId?`https://yandex.ru/maps/org/${p.yaId}/gallery/`:`https://yandex.ru/maps/?text=${encodeURIComponent(p.name+' '+p.addr)}&ll=${p.lon},${p.lat}&z=17`; }
+async function renderPhotos(p){
+  const id=p.id; const ph=$('c-photos'); $('c-photos-note').textContent='';
+  const btn=`<a class="photo-ya" data-ext="${esc(yaGalleryUrl(p))}"><span>📷</span>Фото на Яндекс Картах →</a>`;
   const imgs=[...p.photos];
-  if(!imgs.length){
-    ph.innerHTML='<div class="nophoto">Ищу фото рядом…</div>';
+  if(!imgs.length && !p.wikiChecked){
+    ph.innerHTML=`<div class="nophoto">Ищу фото…</div>`;
     try{
       const r=await fetch(`https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=geosearch&ggscoord=${p.lat}|${p.lon}&ggsradius=60&ggslimit=6&ggsnamespace=6&prop=imageinfo&iiprop=url&iiurlwidth=800`);
       const j=await r.json();
       Object.values(j.query?.pages||{}).forEach(pg=>{ const u=pg.imageinfo?.[0]?.thumburl; if(u&&/\.(jpe?g|png|webp)(\?|$)/i.test(u)) imgs.push(u); });
-      if(imgs.length) $('c-photos-note').textContent='Фото из Wikimedia Commons, снятые в радиусе 60 м: может быть здание, а не интерьер.';
+      p.wikiPhotos=imgs.slice(); p.wikiChecked=true;
     }catch(e){}
     if(cardId!==id) return;
   }
-  if(imgs.length) ph.innerHTML=imgs.map(u=>`<img src="${u}" alt="" loading="lazy">`).join('');
-  else ph.innerHTML='<div class="nophoto">Фото пока нет: 2ГИС по демо-ключу фото не отдаёт, в открытых источниках снимков этого места нет.</div>';
+  const wiki=p.photos.length?[]:(p.wikiPhotos||[]);
+  const all=p.photos.length?p.photos:wiki;
+  if(all.length){
+    ph.innerHTML=all.map(u=>`<img src="${u}" alt="" loading="lazy">`).join('')+`<div class="photo-more">${btn}</div>`;
+    if(wiki.length) $('c-photos-note').textContent='Снимки из Wikimedia Commons в радиусе 60 м: может быть здание, а не интерьер. Фото заведения смотрите на Яндекс Картах.';
+  } else {
+    ph.innerHTML=`<div class="nophoto">Фотографии заведения хранятся на Яндекс Картах.<br>${btn}</div>`;
+  }
 }
 function renderCardContacts(p, searching){
   const tel=p.phone?'tel:'+p.phone.replace(/[^\d+]/g,''):'';
