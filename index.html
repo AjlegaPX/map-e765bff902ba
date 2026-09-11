@@ -184,6 +184,7 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
     <input id="keyya" placeholder="Ключ JavaScript API Яндекс Карт" autocomplete="off">
     <p class="hint">2ГИС по демо-ключу номера не отдаёт. С ключом Яндекса номер и сайт подтягиваются при открытии карточки. Ключ выдаётся бесплатно в кабинете разработчика Яндекса, сервис «JavaScript API и HTTP Геокодер».</p>
     <div class="row2"><button id="m-clear">Очистить кеш</button><button id="m-cancel">Отмена</button><button id="m-save" class="primary">Сохранить</button></div>
+    <p class="hint" style="margin-top:14px">Карта: © участники OpenStreetMap, лицензия ODbL. Данные о заведениях: 2ГИС. Отзывы: 2ГИС, Яндекс Карты.</p>
   </div>
 </div>
 
@@ -261,8 +262,8 @@ function saveCache(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>{
 
 // ---------- карта ----------
 const lastView = ls.get('view', null);
-const map = L.map('map', {zoomControl:false, preferCanvas:true, tap:false}).setView(lastView?[lastView.lat,lastView.lng]:[56.36,41.31], lastView?lastView.z:14);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, keepBuffer:4, updateWhenIdle:true, attribution:'© участники <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · данные: <a href="https://2gis.ru">2ГИС</a>'}).addTo(map);
+const map = L.map('map', {zoomControl:false, attributionControl:false, preferCanvas:true, tap:false}).setView(lastView?[lastView.lat,lastView.lng]:[56.36,41.31], lastView?lastView.z:14);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, keepBuffer:4, updateWhenIdle:true}).addTo(map);
 if(!inTelegram) L.control.zoom({position:'topright'}).addTo(map);
 const markers = L.layerGroup().addTo(map);
 map.on('moveend',()=>{ const c=map.getCenter(); ls.set('view',{lat:c.lat,lng:c.lng,z:map.getZoom()}); });
