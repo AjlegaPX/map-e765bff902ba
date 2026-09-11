@@ -118,6 +118,33 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
 .modal .check input{width:auto;margin:0}
 
 .pin-me{width:14px;height:14px;border-radius:50%;border:2px solid #fff;background:#1E7A4B;box-shadow:0 0 0 6px rgba(30,122,75,.25)}
+
+/* навигатор */
+body.routing .top{display:none}
+.route{position:absolute;top:var(--top-inset);left:0;right:0;z-index:1004;padding:10px;display:none;pointer-events:none}
+.route.open{display:block}
+.route>*{pointer-events:auto}
+.route-top{display:flex;gap:10px;align-items:center;background:var(--paper);border-radius:12px;box-shadow:0 2px 10px rgba(20,30,40,.15);padding:8px 10px}
+.route-close{border:0;background:var(--bg);width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;flex:none}
+.route-info{flex:1;min-width:0}
+.route-title{font-weight:700;font-size:15px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.route-sub{font-size:12.5px;color:var(--ink-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.route-modes{display:flex;gap:4px;flex:none}
+.route-modes button{border:1px solid var(--line);background:var(--paper);width:38px;height:36px;border-radius:8px;font-size:18px;cursor:pointer}
+.route-modes button.on{background:var(--ink);border-color:var(--ink)}
+.route-next{margin-top:8px;background:var(--accent);color:#fff;border-radius:12px;padding:12px 14px;font-size:17px;font-weight:600;line-height:1.3;display:none;box-shadow:0 2px 10px rgba(20,30,40,.2)}
+.route-next.show{display:block}
+.route-next small{display:block;font-size:12.5px;font-weight:500;opacity:.85;margin-top:2px}
+.route-actions{display:flex;gap:8px;margin-top:8px;align-items:center}
+.route-actions button{border:0;background:var(--paper);font:inherit;font-weight:600;font-size:14px;padding:9px 14px;border-radius:10px;cursor:pointer;box-shadow:0 2px 8px rgba(20,30,40,.15)}
+.route-actions button.primary{background:var(--ok);color:#fff}
+.route-actions button.stop{background:var(--accent);color:#fff}
+.route-ext{margin-left:auto;font-size:12.5px;color:var(--ink-2);text-decoration:underline;cursor:pointer;background:rgba(255,255,255,.85);padding:6px 8px;border-radius:8px}
+.steps .row{grid-template-columns:36px 1fr auto}
+.steps .row .thumb{font-size:18px;width:36px;height:36px}
+.steps .row.cur{background:var(--accent-soft)}
+.steps .row .t{font-weight:500;font-size:14px}
+@media (min-width:900px){ .route{right:auto;width:640px} }
 .leaflet-tooltip.lbl{font:600 12px "Golos Text",sans-serif;padding:2px 6px;border-radius:6px}
 
 @media (min-width:900px){
@@ -144,6 +171,20 @@ body{font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sa
 </div>
 
 <button class="locate" id="locate" title="Где я">◎</button>
+
+<div class="route" id="route">
+  <div class="route-top">
+    <button class="route-close" id="r-close">✕</button>
+    <div class="route-info"><div class="route-title" id="r-title">Строю маршрут…</div><div class="route-sub" id="r-sub"></div></div>
+    <div class="route-modes"><button id="r-foot" class="on">🚶</button><button id="r-car">🚗</button></div>
+  </div>
+  <div class="route-next" id="r-next"></div>
+  <div class="route-actions">
+    <button id="r-start" class="primary">Начать ведение</button>
+    <button id="r-voice" title="Голосовые подсказки">🔇</button>
+    <a id="r-ext" class="route-ext">Яндекс Навигатор</a>
+  </div>
+</div>
 
 <div class="sheet collapsed" id="sheet">
   <div class="handle" id="handle"><span>Заведения рядом</span><span class="cnt" id="cnt">—</span></div>
@@ -246,7 +287,7 @@ if(tg){
   try{ tg.ready(); tg.expand(); }catch(e){}
   try{ tg.setHeaderColor && tg.setHeaderColor('#A8213D'); }catch(e){}
   try{ tg.disableVerticalSwipes && tg.disableVerticalSwipes(); }catch(e){}
-  try{ tg.BackButton.onClick(()=>closeCard()); }catch(e){}
+  try{ tg.BackButton.onClick(()=>{ if(typeof nav!=='undefined' && nav.active) stopRoute(); else closeCard(); }); }catch(e){}
 }
 function openExternal(url){ if(tg && tg.openLink){ try{ tg.openLink(url); return; }catch(e){} } window.open(url,'_blank','noopener'); }
 
@@ -452,6 +493,7 @@ let loadTimer=null;
 map.on('moveend',()=>{ renderList(); clearTimeout(loadTimer); loadTimer=setTimeout(loadHere,350); });
 map.on('resize',()=>renderList());
 async function loadHere(){
+  if(nav.active) return;                          // в режиме маршрута заведения не догружаем, бережём лимит
   map.invalidateSize();
   if(map.getSize().x===0){ setTimeout(loadHere,300); return; }
   if(map.getZoom()<12){ status('Приблизьте карту, чтобы увидеть заведения', 2500); return; }
@@ -512,6 +554,7 @@ function visiblePlaces(){
 let renderRaf=null;
 function renderList(){ if(renderRaf) return; renderRaf=requestAnimationFrame(()=>{ renderRaf=null; renderListNow(); }); }
 function renderListNow(){
+  if(typeof nav!=='undefined' && nav.active) return;   // в режиме маршрута в шторке лежат шаги, не трогаем
   const v=visiblePlaces(); const list=$('list'); markers.clearLayers();
   const b=map.getBounds(); let total=0; for(const p of places.values()) if(b.contains([p.lat,p.lon])) total++;
   $('cnt').textContent=v.length+' из '+total;
@@ -592,7 +635,7 @@ function renderCardContacts(p, searching){
     : searching ? `<a class="off"><span>🌐</span>Ищу сайт…</a>`
     : `<a data-ext="${esc(siteSearch)}"><span>🌐</span>Найти сайт</a>`;
   $('c-actions').innerHTML=`${phoneBtn}
-    <a data-ext="${esc(route)}"><span>🧭</span>Маршрут</a>
+    <a data-route="${esc(p.id)}"><span>🧭</span>Маршрут</a>
     ${siteBtn}
     <a data-ext="${esc(gisUrl)}"><span>🪑</span>Бронь</a>`;
   const hrs=hoursText(p);
@@ -618,8 +661,139 @@ function renderCardContacts(p, searching){
 }
 function closeCard(){ $('card').classList.remove('open'); cardId=null; if(tg) try{ tg.BackButton.hide(); }catch(e){} }
 $('close').onclick=closeCard;
-$('card').addEventListener('click',e=>{ const a=e.target.closest('a[data-ext]'); if(a&&a.dataset.ext){ e.preventDefault(); openExternal(a.dataset.ext); } });
+$('card').addEventListener('click',e=>{
+  const r=e.target.closest('a[data-route]'); if(r){ e.preventDefault(); startRoute(r.dataset.route); return; }
+  const a=e.target.closest('a[data-ext]'); if(a&&a.dataset.ext){ e.preventDefault(); openExternal(a.dataset.ext); } });
 $('handle').onclick=()=>$('sheet').classList.toggle('collapsed');
+
+// ---------- навигатор: маршрут внутри страницы (OSRM на данных OpenStreetMap) ----------
+const nav={active:false, place:null, mode:ls.get('routeMode','foot'), route:null, line:null, guiding:false, watchId:null, stepIdx:-1, lastReroute:0, voice:false, followPause:0, spokenIdx:-1};
+const OSRM='https://router.project-osrm.org/route/v1/';
+function fmtDur(s){ const m=Math.round(s/60); return m<60? m+' мин' : Math.floor(m/60)+' ч '+(m%60)+' мин'; }
+const MOD={left:'налево',right:'направо','slight left':'левее','slight right':'правее','sharp left':'резко налево','sharp right':'резко направо',uturn:'разворот',straight:'прямо'};
+function stepText(st){
+  const m=st.maneuver||{}, name=st.name?(' на '+st.name):'', mod=MOD[m.modifier]||'';
+  switch(m.type){
+    case 'depart': return 'Начните движение'+(st.name?' по '+st.name:'');
+    case 'arrive': return 'Вы на месте'+(m.modifier==='left'?', слева':m.modifier==='right'?', справа':'');
+    case 'roundabout': case 'rotary': return 'На кольце '+(m.exit?m.exit+'-й съезд':'сверните')+name;
+    case 'exit roundabout': case 'exit rotary': return 'Съезд с кольца'+name;
+    case 'end of road': return 'В конце дороги '+(mod||'поверните')+name;
+    case 'fork': return 'На развилке держитесь '+(mod||'прямо')+name;
+    case 'merge': return 'Перестройтесь '+(mod||'')+name;
+    case 'on ramp': return 'Съезд '+(mod||'')+name;
+    case 'off ramp': return 'Съезд с дороги '+(mod||'')+name;
+    case 'continue': case 'new name': case 'notification': return (mod&&mod!=='прямо'?'Поверните '+mod:'Продолжайте')+name;
+    case 'turn': default: return (m.modifier==='straight'?'Продолжайте прямо':'Поверните '+(mod||''))+name;
+  }
+}
+const STEP_ICON={left:'↰',right:'↱','slight left':'↖','slight right':'↗','sharp left':'↰','sharp right':'↱',uturn:'↩',straight:'↑'};
+function stepIcon(st){ const m=st.maneuver||{}; if(m.type==='arrive') return '🏁'; if(m.type==='depart') return '📍'; if(/roundabout|rotary/.test(m.type)) return '⟳'; return STEP_ICON[m.modifier]||'↑'; }
+async function startRoute(id){
+  const p=places.get(id); if(!p) return;
+  closeCard(); nav.active=true; nav.place=p; $('route').classList.add('open'); $('sheet').classList.add('collapsed'); document.body.classList.add('routing');
+  $('r-title').textContent='Строю маршрут…'; $('r-sub').textContent=p.name; $('r-next').classList.remove('show');
+  if(tg) try{ tg.BackButton.show(); }catch(e){}
+  $('r-ext').dataset.ext=`https://yandex.ru/maps/?rtext=${me?me[0]+','+me[1]:''}~${p.lat},${p.lon}&rtt=${nav.mode==='foot'?'pd':'auto'}`;
+  if(!me){ status('Определяю ваше местоположение…'); locate(false); await new Promise(r=>setTimeout(r,2500)); }
+  if(!me){ $('r-title').textContent='Нет вашего местоположения'; $('r-sub').textContent='Разрешите геолокацию и нажмите ◎'; return; }
+  buildRoute();
+}
+async function buildRoute(){
+  const p=nav.place; if(!p||!me) return;
+  // routing.openstreetmap.de умеет настоящий пеший профиль; демо-сервер OSRM считает всё как для машины
+  const coords=`${me[1]},${me[0]};${p.lon},${p.lat}?overview=full&geometries=geojson&steps=true`;
+  const servers = nav.mode==='foot'
+    ? [`https://routing.openstreetmap.de/routed-foot/route/v1/driving/${coords}`, `${OSRM}foot/${coords}`]
+    : [`https://routing.openstreetmap.de/routed-car/route/v1/driving/${coords}`, `${OSRM}driving/${coords}`];
+  try{
+    let j=null, lastErr='сервер маршрутов не отвечает';
+    for(const u of servers){
+      try{ const ctrl=new AbortController(); const tm=setTimeout(()=>ctrl.abort(),12000);
+        const r=await fetch(u,{signal:ctrl.signal}); clearTimeout(tm); const jj=await r.json();
+        if(jj.code==='Ok'&&jj.routes?.length){ j=jj; break; } lastErr=jj.message||'маршрут не найден';
+      }catch(e){ lastErr=e.name==='AbortError'?'сервер маршрутов не отвечает':e.message; }
+    }
+    if(!j) throw new Error(lastErr);
+    if(!nav.active) return;
+    const rt=j.routes[0]; nav.route=rt;
+    const steps=rt.legs[0].steps;
+    nav.pts=[]; steps.forEach((st,si)=>{ (st.geometry.coordinates||[]).forEach(c=>nav.pts.push({lat:c[1],lon:c[0],step:si})); });
+    if(nav.line) map.removeLayer(nav.line);
+    nav.line=L.polyline(rt.geometry.coordinates.map(c=>[c[1],c[0]]),{color:'#A8213D',weight:6,opacity:.85,lineCap:'round'}).addTo(map);
+    $('r-title').textContent=(nav.mode==='foot'?'Пешком ':'На машине ')+fmtDist(rt.distance)+' · '+fmtDur(rt.duration);
+    $('r-sub').textContent='до «'+p.name+'»';
+    $('cnt').textContent=steps.length+' шагов'; $('sheet').querySelector('.handle span').textContent='Маршрут';
+    const list=$('list'); list.className='list steps'; list.innerHTML='';
+    steps.forEach((st,i)=>{ const d=document.createElement('div'); d.className='row'; d.dataset.step=i; d.innerHTML=`<div class="thumb">${stepIcon(st)}</div><div><div class="t">${esc(stepText(st))}</div></div><div class="r"><div class="sub">${st.distance>0?fmtDist(st.distance):''}</div></div>`; list.appendChild(d); });
+    if(!nav.guiding){ map.fitBounds(nav.line.getBounds(),{padding:[60,60]}); nav.stepIdx=-1; }
+    else updateGuidance();
+  }catch(e){ if(nav.active){ $('r-title').textContent='Не удалось построить маршрут'; $('r-sub').textContent=e.message+'. Попробуйте ещё раз или откройте Яндекс Навигатор'; } }
+}
+function stopRoute(){
+  nav.active=false; nav.place=null; stopGuidance();
+  if(nav.line){ map.removeLayer(nav.line); nav.line=null; }
+  $('route').classList.remove('open'); $('r-next').classList.remove('show'); document.body.classList.remove('routing');
+  $('list').className='list'; $('sheet').querySelector('.handle span').textContent='Заведения рядом';
+  if(tg) try{ tg.BackButton.hide(); }catch(e){}
+  renderList(); loadHere();
+}
+function nearestOnRoute(lat,lon){
+  let best={d:1e9, idx:0, t:0};
+  for(let i=0;i<nav.pts.length-1;i++){
+    const a=nav.pts[i], b=nav.pts[i+1];
+    const kx=Math.cos(lat*Math.PI/180);
+    const ax=(a.lon-lon)*kx, ay=a.lat-lat, bx=(b.lon-lon)*kx, by=b.lat-lat;
+    const dx=bx-ax, dy=by-ay; const len2=dx*dx+dy*dy;
+    let t=len2? -(ax*dx+ay*dy)/len2 : 0; t=Math.max(0,Math.min(1,t));
+    const px=ax+dx*t, py=ay+dy*t; const d=Math.sqrt(px*px+py*py)*111320;
+    if(d<best.d) best={d, idx:i, t};
+  }
+  return best;
+}
+function updateGuidance(){
+  if(!nav.guiding||!nav.route||!me) return;
+  const n=nearestOnRoute(me[0],me[1]);
+  const offLimit=nav.mode==='foot'?45:80;
+  if(n.d>offLimit && Date.now()-nav.lastReroute>10000){ nav.lastReroute=Date.now(); $('r-sub').textContent='Перестраиваю маршрут…'; buildRoute(); return; }
+  const steps=nav.route.legs[0].steps;
+  const curStep=nav.pts[n.idx].step;
+  // расстояние до конца текущего шага = остаток текущего сегмента + сегменты шага дальше
+  let rem=0; const a=nav.pts[n.idx], b=nav.pts[n.idx+1];
+  rem+=map.distance([a.lat+(b.lat-a.lat)*n.t, a.lon+(b.lon-a.lon)*n.t],[b.lat,b.lon]);
+  for(let i=n.idx+1;i<nav.pts.length-1 && nav.pts[i].step===curStep;i++) rem+=map.distance([nav.pts[i].lat,nav.pts[i].lon],[nav.pts[i+1].lat,nav.pts[i+1].lon]);
+  const next=steps[Math.min(curStep+1, steps.length-1)];
+  const text=curStep>=steps.length-1 ? 'Вы на месте' : stepText(next);
+  $('r-next').innerHTML=`${curStep>=steps.length-1?'':'Через '+fmtDist(Math.max(0,Math.round(rem/10)*10))+': '}${esc(text)}<small>${nav.place.name}</small>`;
+  $('r-next').classList.add('show');
+  if(curStep!==nav.stepIdx){ nav.stepIdx=curStep; document.querySelectorAll('.steps .row').forEach(r=>r.classList.toggle('cur', +r.dataset.step===curStep+1)); }
+  if(nav.voice && rem<60 && nav.spokenIdx!==curStep){ nav.spokenIdx=curStep; speak(text); }
+  if(Date.now()>nav.followPause) map.setView(me, Math.max(map.getZoom(),17), {animate:true});
+  if(map.distance(me,[nav.place.lat,nav.place.lon])<25){ $('r-next').innerHTML='Вы на месте<small>'+esc(nav.place.name)+'</small>'; if(nav.voice&&nav.spokenIdx!==-2){ nav.spokenIdx=-2; speak('Вы на месте'); } stopGuidance(); }
+}
+function speak(t){ try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t); u.lang='ru-RU'; speechSynthesis.speak(u); }catch(e){} }
+function startGuidance(){
+  if(!nav.route) return;
+  nav.guiding=true; $('r-start').textContent='Остановить'; $('r-start').className='stop'; $('sheet').classList.add('collapsed');
+  if(navigator.geolocation && nav.watchId==null){
+    nav.watchId=navigator.geolocation.watchPosition(p=>{ setMe(p.coords.latitude,p.coords.longitude,p.coords.accuracy,false); updateGuidance(); }, ()=>{}, {enableHighAccuracy:true, maximumAge:1000, timeout:15000});
+  }
+  updateGuidance();
+}
+function stopGuidance(){
+  nav.guiding=false; $('r-start').textContent='Начать ведение'; $('r-start').className='primary';
+  if(nav.watchId!=null){ try{ navigator.geolocation.clearWatch(nav.watchId); }catch(e){} nav.watchId=null; }
+  try{ speechSynthesis.cancel(); }catch(e){}
+}
+$('r-close').onclick=stopRoute;
+$('r-start').onclick=()=>nav.guiding?stopGuidance():startGuidance();
+$('r-voice').onclick=()=>{ nav.voice=!nav.voice; $('r-voice').textContent=nav.voice?'🔊':'🔇'; if(nav.voice) speak('Голосовые подсказки включены'); };
+$('r-foot').onclick=()=>{ nav.mode='foot'; ls.set('routeMode','foot'); $('r-foot').classList.add('on'); $('r-car').classList.remove('on'); buildRoute(); };
+$('r-car').onclick=()=>{ nav.mode='car'; ls.set('routeMode','car'); $('r-car').classList.add('on'); $('r-foot').classList.remove('on'); buildRoute(); };
+$('r-ext').onclick=()=>openExternal($('r-ext').dataset.ext);
+if(nav.mode==='car'){ $('r-car').classList.add('on'); $('r-foot').classList.remove('on'); }
+map.on('dragstart',()=>{ nav.followPause=Date.now()+8000; });
+$('list').addEventListener('click',e=>{ const row=e.target.closest('.steps .row'); if(row&&nav.route){ const st=nav.route.legs[0].steps[+row.dataset.step]; const c=st.maneuver.location; map.setView([c[1],c[0]],17); } });
 
 // ---------- настройки ----------
 $('settings').onclick=()=>{ $('key2gis').value=settings.key; $('keyya').value=settings.ykey; $('threshold').value=String(settings.threshold); $('minrev').value=String(settings.minrev); $('shownorate').checked=settings.shownorate; $('reqcount').textContent=ls.get('reqcount',0)||0; $('modal').classList.add('open'); };
